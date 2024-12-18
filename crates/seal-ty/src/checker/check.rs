@@ -28,9 +28,32 @@ impl<'tcx> Checker<'tcx> {
 						};
 
 						for var_declarator in &var.decls {
-							let init = var_declarator.init.as_ref().unwrap();
+							if let Some(init) = &var_declarator.init {
+								let kind = match &**init {
+									Expr::Lit(lit) => match lit {
+										Lit::Bool(_) => TyKind::Boolean,
+										Lit::Num(_) => TyKind::Number,
+										Lit::Str(_) => TyKind::String,
+										_ => unimplemented!(),
+									},
+									_ => unimplemented!(),
+								};
 
-							let kind = match &**init {
+								let ty = self.tcx.new_ty(kind);
+								let id = var_declarator.name.clone().expect_ident().to_id();
+
+								self.tcx.set_ty(id, ty);
+							}
+						}
+					}
+					_ => unimplemented!(),
+				},
+				Stmt::Expr(stmt) => {
+					// dbg!(&stmt.expr);
+					match &*stmt.expr {
+						Expr::Assign(assign) => {
+							let id = assign.left.clone().expect_simple().expect_ident().to_id();
+							let kind = match &*assign.right {
 								Expr::Lit(lit) => match lit {
 									Lit::Bool(_) => TyKind::Boolean,
 									Lit::Num(_) => TyKind::Number,
@@ -41,13 +64,18 @@ impl<'tcx> Checker<'tcx> {
 							};
 
 							let ty = self.tcx.new_ty(kind);
-							let id = var_declarator.name.clone().expect_ident().to_id();
+
+							if let Some(expected_ty) = self.tcx.get_ty(&id) {
+								if expected_ty != ty {
+									panic!("Type mismatch");
+								}
+							}
 
 							self.tcx.set_ty(id, ty);
 						}
+						_ => unimplemented!("{:#?}", stmt.expr),
 					}
-					_ => unimplemented!(),
-				},
+				}
 				_ => unimplemented!("{:#?}", stmt),
 			}
 		}
@@ -62,7 +90,7 @@ mod tests {
 
 	#[test]
 	fn test_checker() {
-		let code = "let a = 1; a = 2;";
+		let code = "let a; a = 1;";
 		let result = parse::parse(code).unwrap();
 
 		let ast = result.program;
