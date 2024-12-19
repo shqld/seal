@@ -141,7 +141,7 @@ mod tests {
 
 	#[test]
 	fn test_checker() {
-		let code = "let a; a = 1; a satisfies number;";
+		let code = "";
 		let result = parse::parse(code).unwrap();
 
 		let ast = result.program;
@@ -149,4 +149,56 @@ mod tests {
 
 		checker.check();
 	}
+
+	fn run(code: &'static str) {
+		let result = parse::parse(code).unwrap();
+
+		let ast = result.program;
+		let checker = Checker::new(ast);
+
+		checker.check();
+	}
+
+	macro_rules! pass {
+		($case_name:ident, $code:literal) => {
+			#[test]
+			fn $case_name() {
+				run($code);
+			}
+		};
+	}
+
+	macro_rules! fail {
+		($case_name:ident, $code:literal) => {
+			#[should_panic]
+			#[test]
+			fn $case_name() {
+				run($code);
+			}
+		};
+	}
+
+	pass!(
+		let_,
+		r#"
+            let a = 1;
+            a satisfies number;
+        "#
+	);
+
+	pass!(
+		let_uninitialized_,
+		r#"
+            let a; a = 1;
+            a satisfies number;
+        "#
+	);
+
+	fail!(
+		assign_,
+		r#"
+            let a = 1;
+            a = "hello";
+        "#
+	);
 }
