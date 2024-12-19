@@ -1,6 +1,10 @@
+use swc_ecma_ast::{
+	Decl, Expr, ExprStmt, Lit, ModuleItem, Program, Stmt, TsKeywordTypeKind, TsSatisfiesExpr,
+	TsType, VarDeclKind,
+};
+
 use super::Checker;
 use crate::{Ty, TyKind};
-use swc_ecma_ast::{Decl, Expr, ExprStmt, Lit, ModuleItem, Program, Stmt, VarDeclKind};
 
 impl<'tcx> Checker<'tcx> {
 	pub fn check(&'tcx self) {
@@ -83,14 +87,45 @@ impl<'tcx> Checker<'tcx> {
 
 				ty
 			}
+			Expr::TsSatisfies(TsSatisfiesExpr { expr, type_ann, .. }) => {
+				let expected_ty = self.build_tstype(type_ann);
+				let actual_ty = self.build_expr(expr);
+
+				if self.satisfies(expected_ty, actual_ty) {
+					panic!("Type mismatch");
+				}
+
+				actual_ty
+			}
 			Expr::Lit(lit) => self.tcx.new_ty(match lit {
 				Lit::Bool(_) => TyKind::Boolean,
 				Lit::Num(_) => TyKind::Number,
 				Lit::Str(_) => TyKind::String,
 				_ => unimplemented!(),
 			}),
+			Expr::Ident(ident) => {
+				let id = ident.to_id();
+
+				if let Some(ty) = self.tcx.get_ty(&id) {
+					ty
+				} else {
+					panic!("Type not found");
+				}
+			}
 			_ => unimplemented!("{:#?}", expr),
 		}
+	}
+
+	fn build_tstype(&'tcx self, tstype: &TsType) -> Ty<'tcx> {
+		self.tcx.new_ty(match tstype {
+			TsType::TsKeywordType(keyword) => match keyword.kind {
+				TsKeywordTypeKind::TsNumberKeyword => TyKind::Number,
+				TsKeywordTypeKind::TsStringKeyword => TyKind::String,
+				TsKeywordTypeKind::TsBooleanKeyword => TyKind::Boolean,
+				_ => unimplemented!(),
+			},
+			_ => unimplemented!("{:#?}", tstype),
+		})
 	}
 
 	fn satisfies(&self, expected: Ty<'tcx>, actual: Ty<'tcx>) -> bool {
@@ -106,7 +141,7 @@ mod tests {
 
 	#[test]
 	fn test_checker() {
-		let code = "let a; a = 1;";
+		let code = "let a; a = 1; a satisfies number;";
 		let result = parse::parse(code).unwrap();
 
 		let ast = result.program;
