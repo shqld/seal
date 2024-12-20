@@ -1,20 +1,18 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use swc_ecma_ast::{Id, Program};
+use swc_ecma_ast::Id;
 
 use crate::{Ty, TyKind, interner::interner::Interner};
 
 pub struct TyContext<'tcx> {
-	pub ast: Program,
 	interner: Interner<'tcx, TyKind<'tcx>>,
 	map: RefCell<HashMap<Id, Ty<'tcx>>>,
 }
 
 impl<'tcx> TyContext<'tcx> {
 	#[allow(clippy::new_without_default)]
-	pub fn new(ast: Program) -> Self {
+	pub fn new() -> Self {
 		Self {
-			ast,
 			interner: Interner::new(),
 			map: RefCell::new(HashMap::new()),
 		}

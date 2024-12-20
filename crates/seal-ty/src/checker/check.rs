@@ -7,8 +7,8 @@ use super::Checker;
 use crate::{Ty, TyKind};
 
 impl<'tcx> Checker<'tcx> {
-	pub fn check(&'tcx self) {
-		let stmts = match &self.tcx.ast {
+	pub fn check(&'tcx self, ast: &Program) {
+		let stmts = match &ast {
 			Program::Script(script) => &script.body,
 			Program::Module(module) => &module
 				.body
@@ -135,28 +135,19 @@ impl<'tcx> Checker<'tcx> {
 
 #[cfg(test)]
 mod tests {
-	use crate::checker::parse;
+	use crate::checker::{context::TyContext, parse};
 
 	use super::*;
-
-	#[test]
-	fn test_checker() {
-		let code = "";
-		let result = parse::parse(code).unwrap();
-
-		let ast = result.program;
-		let checker = Checker::new(ast);
-
-		checker.check();
-	}
 
 	fn run(code: &'static str) {
 		let result = parse::parse(code).unwrap();
 
 		let ast = result.program;
-		let checker = Checker::new(ast);
+		let tcx = TyContext::new();
 
-		checker.check();
+		let checker = Checker::new(tcx);
+
+		checker.check(&ast);
 	}
 
 	macro_rules! pass {
