@@ -1,6 +1,6 @@
 use swc_ecma_ast::{
-	Decl, Expr, ExprStmt, Lit, ModuleItem, Program, Stmt, TsKeywordTypeKind, TsSatisfiesExpr,
-	TsType, VarDeclKind,
+	Decl, Expr, ExprStmt, FnDecl, Function, Lit, ModuleItem, Pat, Program, ReturnStmt, Stmt,
+	TsFnOrConstructorType, TsKeywordTypeKind, TsSatisfiesExpr, TsType, VarDeclKind,
 };
 
 use super::Checker;
@@ -30,6 +30,20 @@ impl<'tcx> Checker<'tcx> {
 			Stmt::Decl(decl) => self.check_decl(decl),
 			Stmt::Expr(ExprStmt { expr, .. }) => {
 				self.build_expr(expr);
+			}
+			Stmt::Return(ReturnStmt { arg, .. }) => {
+				let ret_ty = match arg {
+					Some(arg) => self.build_expr(arg),
+					None => self.tcx.new_ty(TyKind::Void),
+				};
+
+				let expected_ty = self.get_current_function_return_ty().unwrap();
+
+				if self.satisfies(expected_ty, ret_ty) {
+					panic!("Return type mismatch");
+				}
+
+				self.set_function_has_returned();
 			}
 			_ => unimplemented!("{:#?}", stmt),
 		}
@@ -63,8 +77,67 @@ impl<'tcx> Checker<'tcx> {
 					}
 				}
 			}
+			Decl::Fn(FnDecl {
+				ident, function, ..
+			}) => {
+				let id = ident.to_id();
+
+				let ty = self.build_function(function);
+
+				self.tcx.set_ty(id, ty);
+			}
 			_ => unimplemented!("{:#?}", decl),
 		}
+	}
+
+	fn build_function(&'tcx self, function: &Function) -> Ty<'tcx> {
+		let return_ty = function
+			.return_type
+			.as_ref()
+			.map(|rt| self.build_tstype(&rt.type_ann))
+			.unwrap_or(self.tcx.new_ty(TyKind::Void));
+
+		self.push_function_scope(return_ty);
+
+		let mut param_tys = vec![];
+		for param in &function.params {
+			match &param.pat {
+				Pat::Ident(ident) => {
+					if let Some(ty) = &ident.type_ann {
+						let id = ident.to_id();
+						let ty = self.build_tstype(&ty.type_ann);
+
+						self.tcx.set_ty(id, ty);
+						param_tys.push(ty);
+					} else {
+						panic!("Type annotation is required");
+					};
+				}
+				_ => unimplemented!("{:#?}", param),
+			}
+		}
+
+		let body = match &function.body {
+			Some(body) => body,
+			None => panic!("Function body is required"),
+		};
+
+		for stmt in &body.stmts {
+			self.check_stmt(stmt);
+		}
+
+		if !self.get_current_function_has_returned() && return_ty != self.tcx.new_ty(TyKind::Void) {
+			panic!("Function does not return");
+		}
+
+		let ty = self.tcx.new_ty(TyKind::Function {
+			params: param_tys,
+			ret: return_ty,
+		});
+
+		self.pop_function_scope();
+
+		ty
 	}
 
 	fn build_expr(&'tcx self, expr: &Expr) -> Ty<'tcx> {
@@ -109,7 +182,7 @@ impl<'tcx> Checker<'tcx> {
 				if let Some(ty) = self.tcx.get_ty(&id) {
 					ty
 				} else {
-					panic!("Type not found");
+					panic!("Type not found: {:?}", ident.sym);
 				}
 			}
 			_ => unimplemented!("{:#?}", expr),
@@ -122,6 +195,27 @@ impl<'tcx> Checker<'tcx> {
 				TsKeywordTypeKind::TsNumberKeyword => TyKind::Number,
 				TsKeywordTypeKind::TsStringKeyword => TyKind::String,
 				TsKeywordTypeKind::TsBooleanKeyword => TyKind::Boolean,
+				TsKeywordTypeKind::TsVoidKeyword => TyKind::Void,
+				_ => unimplemented!(),
+			},
+			TsType::TsFnOrConstructorType(fn_or_constructor) => match fn_or_constructor {
+				TsFnOrConstructorType::TsFnType(fn_) => {
+					let return_ty = self.build_tstype(&fn_.type_ann.type_ann);
+
+					let mut param_tys = vec![];
+					for param in &fn_.params {
+						let ty = self.build_tstype(
+							// TODO:
+							&param.clone().expect_ident().type_ann.unwrap().type_ann,
+						);
+						param_tys.push(ty);
+					}
+
+					TyKind::Function {
+						params: param_tys,
+						ret: return_ty,
+					}
+				}
 				_ => unimplemented!(),
 			},
 			_ => unimplemented!("{:#?}", tstype),
@@ -190,6 +284,75 @@ mod tests {
 		r#"
             let a = 1;
             a = "hello";
+        "#
+	);
+
+	pass!(
+		function_1_,
+		r#"
+            function f(): void {
+            }
+
+            f satisfies () => void;
+        "#
+	);
+
+	pass!(
+		function_void_,
+		r#"
+            function f(n: number): void {
+                return;
+            }
+
+            f satisfies (n: number) => void;
+        "#
+	);
+
+	pass!(
+		function_void_wo_ret_,
+		r#"
+            function f(n: number): void {
+            }
+
+            f satisfies (n: number) => void;
+        "#
+	);
+
+	pass!(
+		function_3_,
+		r#"
+            function f(n: number, s: string, b: boolean): void {
+            }
+
+            f satisfies (n: number, s: string, b: boolean) => void;
+        "#
+	);
+
+	pass!(
+		function_ret_,
+		r#"
+            function f(n: number): number {
+                return n;
+            }
+
+            f satisfies (n: number) => number;
+        "#
+	);
+
+	fail!(
+		function_ret_mismatch_1_,
+		r#"
+            function f(n: number): number {
+            }
+        "#
+	);
+
+	fail!(
+		function_ret_mismatch_2_,
+		r#"
+            function f(n: number): number {
+                return;
+            }
         "#
 	);
 }

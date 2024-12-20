@@ -2,6 +2,8 @@ pub mod infer;
 
 use std::{fmt::Display, hash::Hash};
 
+use crate::Ty;
+
 use self::infer::{Infer, InferKind};
 
 #[derive(Debug, Hash, PartialEq, Eq)]
@@ -11,6 +13,11 @@ pub enum TyKind<'tcx> {
 	String,
 	Err,
 	Infer(Infer<'tcx>),
+	Function {
+		params: Vec<Ty<'tcx>>,
+		ret: Ty<'tcx>,
+	},
+	Void,
 }
 
 impl Display for TyKind<'_> {
@@ -24,6 +31,17 @@ impl Display for TyKind<'_> {
 				InferKind::Resolved(ty) => write!(f, "{}", ty),
 				InferKind::Unresolved(id) => write!(f, "<infer: {}>", id),
 			},
+			TyKind::Function { params, ret } => write!(
+				f,
+				"({}) => {}",
+				params
+					.iter()
+					.map(|ty| ty.to_string())
+					.collect::<Vec<_>>()
+					.join(", "),
+				ret
+			),
+			TyKind::Void => write!(f, "void"),
 		}
 	}
 }
