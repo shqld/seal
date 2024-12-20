@@ -39,7 +39,7 @@ impl<'tcx> Checker<'tcx> {
 
 				let expected_ty = self.get_current_function_return_ty().unwrap();
 
-				if self.satisfies(expected_ty, ret_ty) {
+				if !self.satisfies(expected_ty, ret_ty) {
 					panic!("Return type mismatch");
 				}
 
@@ -148,7 +148,7 @@ impl<'tcx> Checker<'tcx> {
 				let actual_ty = self.build_expr(&assign.right);
 
 				let ty = if let Some(expected_ty) = self.tcx.get_ty(&id) {
-					if self.satisfies(expected_ty, actual_ty) {
+					if !self.satisfies(expected_ty, actual_ty) {
 						panic!("Type mismatch");
 					}
 
@@ -164,7 +164,7 @@ impl<'tcx> Checker<'tcx> {
 				let expected_ty = self.build_tstype(type_ann);
 				let actual_ty = self.build_expr(expr);
 
-				if self.satisfies(expected_ty, actual_ty) {
+				if !self.satisfies(expected_ty, actual_ty) {
 					panic!("Type mismatch");
 				}
 
@@ -223,6 +223,6 @@ impl<'tcx> Checker<'tcx> {
 	}
 
 	fn satisfies(&self, expected: Ty<'tcx>, actual: Ty<'tcx>) -> bool {
-		expected != actual
+		expected == actual
 	}
 }
