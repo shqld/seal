@@ -4,7 +4,7 @@ use swc_ecma_ast::{
 };
 
 use super::Checker;
-use crate::{Ty, TyKind};
+use crate::{Ty, TyKind, kind::FunctionTy};
 
 impl<'tcx> Checker<'tcx> {
 	pub fn check(&'tcx self, ast: &Program) {
@@ -103,15 +103,14 @@ impl<'tcx> Checker<'tcx> {
 		for param in &function.params {
 			match &param.pat {
 				Pat::Ident(ident) => {
-					if let Some(ty) = &ident.type_ann {
-						let id = ident.to_id();
-						let ty = self.build_tstype(&ty.type_ann);
-
-						self.tcx.set_ty(id, ty);
-						param_tys.push(ty);
-					} else {
-						panic!("Type annotation is required");
+					let id = ident.to_id();
+					let ty = match &ident.type_ann {
+						Some(ty) => self.build_tstype(&ty.type_ann),
+						None => self.tcx.new_infer_ty(),
 					};
+
+					self.tcx.set_ty(id, ty);
+					param_tys.push(ty);
 				}
 				_ => unimplemented!("{:#?}", param),
 			}
@@ -130,10 +129,10 @@ impl<'tcx> Checker<'tcx> {
 			panic!("Function does not return");
 		}
 
-		let ty = self.tcx.new_ty(TyKind::Function {
+		let ty = self.tcx.new_ty(TyKind::Function(FunctionTy {
 			params: param_tys,
 			ret: return_ty,
-		});
+		}));
 
 		self.pop_function_scope();
 
@@ -165,6 +164,7 @@ impl<'tcx> Checker<'tcx> {
 				let actual_ty = self.build_expr(expr);
 
 				if !self.satisfies(expected_ty, actual_ty) {
+					dbg!(expected_ty, actual_ty);
 					panic!("Type mismatch");
 				}
 
@@ -211,10 +211,10 @@ impl<'tcx> Checker<'tcx> {
 						param_tys.push(ty);
 					}
 
-					TyKind::Function {
+					TyKind::Function(FunctionTy {
 						params: param_tys,
 						ret: return_ty,
-					}
+					})
 				}
 				_ => unimplemented!(),
 			},
@@ -223,6 +223,29 @@ impl<'tcx> Checker<'tcx> {
 	}
 
 	fn satisfies(&self, expected: Ty<'tcx>, actual: Ty<'tcx>) -> bool {
-		expected == actual
+		use TyKind::*;
+
+		match (expected.kind(), actual.kind()) {
+			(_, Infer(id)) => match self.tcx.infer.resolve_ty(*id) {
+				Some(actual) => self.satisfies(expected, actual),
+				None => {
+					self.tcx.infer.add_constraint(*id, expected);
+					// TODO: unify when function scope ends
+					self.tcx.infer.unify(*id, expected);
+
+					true
+				}
+			},
+			(Function(expected), Function(actual)) => {
+				for (expected, actual) in expected.params.iter().zip(&actual.params) {
+					if !self.satisfies(*expected, *actual) {
+						return false;
+					}
+				}
+
+				self.satisfies(expected.ret, actual.ret)
+			}
+			_ => expected == actual,
+		}
 	}
 }

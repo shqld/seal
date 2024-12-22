@@ -1,10 +1,6 @@
-pub mod infer;
-
 use std::{fmt::Display, hash::Hash};
 
-use crate::Ty;
-
-use self::infer::{Infer, InferKind};
+use crate::{Ty, infer::InferId};
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub enum TyKind<'tcx> {
@@ -12,12 +8,9 @@ pub enum TyKind<'tcx> {
 	Number,
 	String,
 	Err,
-	Infer(Infer<'tcx>),
-	Function {
-		params: Vec<Ty<'tcx>>,
-		ret: Ty<'tcx>,
-	},
+	Function(FunctionTy<'tcx>),
 	Void,
+	Infer(InferId),
 }
 
 impl Display for TyKind<'_> {
@@ -27,11 +20,8 @@ impl Display for TyKind<'_> {
 			TyKind::Number => write!(f, "number"),
 			TyKind::String => write!(f, "string"),
 			TyKind::Err => write!(f, "<err>"),
-			TyKind::Infer(inf) => match inf.kind() {
-				InferKind::Resolved(ty) => write!(f, "{}", ty),
-				InferKind::Unresolved(id) => write!(f, "<infer: {}>", id),
-			},
-			TyKind::Function { params, ret } => write!(
+			TyKind::Infer(id) => write!(f, "<infer: {id}>",),
+			TyKind::Function(FunctionTy { params, ret }) => write!(
 				f,
 				"({}) => {}",
 				params
@@ -46,15 +36,14 @@ impl Display for TyKind<'_> {
 	}
 }
 
-impl<'tcx> TyKind<'tcx> {
+impl TyKind<'_> {
 	pub fn is_err(&self) -> bool {
 		matches!(self, TyKind::Err)
 	}
+}
 
-	pub fn as_infer(&self) -> Option<&Infer<'tcx>> {
-		match self {
-			TyKind::Infer(infer) => Some(infer),
-			_ => None,
-		}
-	}
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct FunctionTy<'tcx> {
+	pub params: Vec<Ty<'tcx>>,
+	pub ret: Ty<'tcx>,
 }

@@ -122,3 +122,25 @@ fail!(
         }
     "#
 );
+
+pass!(
+	infer_function_param_,
+	r#"
+        function f(n): number {
+            return n;
+        }
+
+        f satisfies (n: number) => number;
+    "#
+);
+
+fail!(
+	inferred_function_param_mismatch_,
+	r#"
+        function f(n): number {
+            return n;
+        }
+
+        f satisfies (n: string) => number;
+    "#
+);

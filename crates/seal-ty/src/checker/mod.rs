@@ -1,5 +1,6 @@
 pub mod check;
 pub mod context;
+// pub mod infer;
 pub mod parse;
 
 use std::cell::RefCell;
