@@ -37,7 +37,8 @@ impl<'tcx> Checker<'tcx> {
 					None => self.tcx.new_ty(TyKind::Void),
 				};
 
-				let expected_ty = self.get_current_function_return_ty().unwrap();
+				let scope = self.get_current_scope();
+				let expected_ty = self.tcx.get_ret_ty(&scope).unwrap();
 
 				if let TyKind::Infer(id) = expected_ty.kind() {
 					self.tcx.infer.add_constraint(*id, ret_ty);
@@ -46,11 +47,10 @@ impl<'tcx> Checker<'tcx> {
 				}
 
 				if !self.satisfies(expected_ty, ret_ty) {
-					dbg!(expected_ty, ret_ty);
 					panic!("Return type mismatch");
 				}
 
-				self.set_function_has_returned();
+				scope.has_returned.set(true);
 			}
 			_ => unimplemented!("{:#?}", stmt),
 		}
@@ -67,17 +67,7 @@ impl<'tcx> Checker<'tcx> {
 
 				for var_declarator in &var.decls {
 					if let Some(init) = &var_declarator.init {
-						let kind = match &**init {
-							Expr::Lit(lit) => match lit {
-								Lit::Bool(_) => TyKind::Boolean,
-								Lit::Num(_) => TyKind::Number,
-								Lit::Str(_) => TyKind::String,
-								_ => unimplemented!(),
-							},
-							_ => unimplemented!(),
-						};
-
-						let ty = self.tcx.new_ty(kind);
+						let ty = self.build_expr(init);
 						let id = var_declarator.name.clone().expect_ident().to_id();
 
 						self.tcx.set_ty(id, ty);
@@ -98,13 +88,14 @@ impl<'tcx> Checker<'tcx> {
 	}
 
 	fn build_function(&'tcx self, function: &Function) -> Ty<'tcx> {
-		let return_ty = function
+		let ret_ty = function
 			.return_type
 			.as_ref()
 			.map(|rt| self.build_tstype(&rt.type_ann))
 			.unwrap_or(self.tcx.new_infer_ty());
 
-		self.push_function_scope(return_ty);
+		let scope = self.push_scope(function.ctxt);
+		self.tcx.set_ret_ty(&scope, ret_ty);
 
 		let mut param_tys = vec![];
 		for param in &function.params {
@@ -132,16 +123,16 @@ impl<'tcx> Checker<'tcx> {
 			self.check_stmt(stmt);
 		}
 
-		if !self.get_current_function_has_returned() && return_ty != self.tcx.new_ty(TyKind::Void) {
+		if !scope.has_returned.get() && ret_ty != self.tcx.new_ty(TyKind::Void) {
 			panic!("Function does not return");
 		}
 
 		let ty = self.tcx.new_ty(TyKind::Function(FunctionTy {
 			params: param_tys,
-			ret: return_ty,
+			ret: ret_ty,
 		}));
 
-		self.pop_function_scope();
+		self.pop_scope();
 
 		ty
 	}
@@ -207,7 +198,7 @@ impl<'tcx> Checker<'tcx> {
 			},
 			TsType::TsFnOrConstructorType(fn_or_constructor) => match fn_or_constructor {
 				TsFnOrConstructorType::TsFnType(fn_) => {
-					let return_ty = self.build_tstype(&fn_.type_ann.type_ann);
+					let ret_ty = self.build_tstype(&fn_.type_ann.type_ann);
 
 					let mut param_tys = vec![];
 					for param in &fn_.params {
@@ -220,7 +211,7 @@ impl<'tcx> Checker<'tcx> {
 
 					TyKind::Function(FunctionTy {
 						params: param_tys,
-						ret: return_ty,
+						ret: ret_ty,
 					})
 				}
 				_ => unimplemented!(),

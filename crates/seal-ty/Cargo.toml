@@ -15,6 +15,7 @@ swc_ecma_parser = "6"
 swc_ecma_transforms_base = "6"
 swc_ecma_visit = "5"
 swc_common = "5"
+swc_atoms = "3"
 
 [dev-dependencies]
 insta = "1.34"
