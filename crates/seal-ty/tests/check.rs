@@ -144,3 +144,25 @@ fail!(
         f satisfies (n: string) => number;
     "#
 );
+
+pass!(
+	infer_function_ret_,
+	r#"
+        function f(n: number) {
+            return n;
+        }
+
+        f satisfies (n: number) => number;
+    "#
+);
+
+fail!(
+	infer_function_ret_mismatch_,
+	r#"
+        function f(n: number) {
+            return n;
+        }
+
+        f satisfies (n: number) => string;
+    "#
+);

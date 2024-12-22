@@ -39,7 +39,14 @@ impl<'tcx> Checker<'tcx> {
 
 				let expected_ty = self.get_current_function_return_ty().unwrap();
 
+				if let TyKind::Infer(id) = expected_ty.kind() {
+					self.tcx.infer.add_constraint(*id, ret_ty);
+					// TODO: unify when function scope ends
+					self.tcx.infer.unify(*id, ret_ty);
+				}
+
 				if !self.satisfies(expected_ty, ret_ty) {
+					dbg!(expected_ty, ret_ty);
 					panic!("Return type mismatch");
 				}
 
@@ -95,7 +102,7 @@ impl<'tcx> Checker<'tcx> {
 			.return_type
 			.as_ref()
 			.map(|rt| self.build_tstype(&rt.type_ann))
-			.unwrap_or(self.tcx.new_ty(TyKind::Void));
+			.unwrap_or(self.tcx.new_infer_ty());
 
 		self.push_function_scope(return_ty);
 
@@ -226,6 +233,12 @@ impl<'tcx> Checker<'tcx> {
 		use TyKind::*;
 
 		match (expected.kind(), actual.kind()) {
+			(Infer(id), _) => match self.tcx.infer.resolve_ty(*id) {
+				Some(expected) => self.satisfies(expected, actual),
+				None => {
+					panic!("Expecting unresolved infer type");
+				}
+			},
 			(_, Infer(id)) => match self.tcx.infer.resolve_ty(*id) {
 				Some(actual) => self.satisfies(expected, actual),
 				None => {
