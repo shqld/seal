@@ -1,18 +1,17 @@
 pub mod check;
-pub mod context;
-// pub mod infer;
 pub mod parse;
 pub mod scope;
 
 use std::{cell::RefCell, rc::Rc};
 
-use context::TyContext;
 use scope::Scope;
 use swc_common::SyntaxContext;
 
+use crate::context::TyContext;
+
 pub struct Checker<'tcx> {
-	tcx: TyContext<'tcx>,
-	scopes: RefCell<Vec<Rc<Scope>>>,
+	pub tcx: TyContext<'tcx>,
+	pub scopes: RefCell<Vec<Rc<Scope>>>,
 }
 
 impl<'tcx> Checker<'tcx> {
@@ -23,7 +22,7 @@ impl<'tcx> Checker<'tcx> {
 		}
 	}
 
-	fn push_scope(&self, ctx: SyntaxContext) -> Rc<Scope> {
+	pub fn push_scope(&self, ctx: SyntaxContext) -> Rc<Scope> {
 		let scope = Rc::new(Scope::new(ctx));
 
 		self.scopes.borrow_mut().push(scope.clone());
@@ -31,11 +30,11 @@ impl<'tcx> Checker<'tcx> {
 		scope
 	}
 
-	fn get_current_scope(&self) -> Rc<Scope> {
+	pub fn get_current_scope(&self) -> Rc<Scope> {
 		self.scopes.borrow().last().unwrap().clone()
 	}
 
-	fn pop_scope(&self) {
+	pub fn pop_scope(&self) {
 		self.scopes.borrow_mut().pop();
 	}
 }

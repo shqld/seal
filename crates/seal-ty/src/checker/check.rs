@@ -3,8 +3,9 @@ use swc_ecma_ast::{
 	TsFnOrConstructorType, TsKeywordTypeKind, TsSatisfiesExpr, TsType, VarDeclKind,
 };
 
-use super::Checker;
 use crate::{Ty, TyKind, kind::FunctionTy};
+
+use super::Checker;
 
 impl<'tcx> Checker<'tcx> {
 	pub fn check(&'tcx self, ast: &Program) {
