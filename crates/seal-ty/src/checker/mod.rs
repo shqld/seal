@@ -14,8 +14,8 @@ pub struct Checker<'tcx> {
 	pub scopes: RefCell<Vec<Rc<Scope>>>,
 }
 
-impl<'tcx> Checker<'tcx> {
-	pub fn new(tcx: TyContext<'tcx>) -> Checker<'tcx> {
+impl Checker<'_> {
+	pub fn new(tcx: TyContext) -> Checker {
 		Checker {
 			tcx,
 			scopes: RefCell::new(vec![]),
