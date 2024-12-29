@@ -1,11 +1,11 @@
 use swc_ecma_ast::{
-	Decl, Expr, ExprStmt, FnDecl, Lit, ModuleItem, Pat, Program, ReturnStmt, Stmt, TsSatisfiesExpr,
-	VarDeclKind,
+	AssignTarget, Decl, Expr, ExprStmt, FnDecl, Lit, ModuleItem, Pat, Program, ReturnStmt,
+	SimpleAssignTarget, Stmt, TsSatisfiesExpr, VarDeclKind,
 };
 
 use super::{
 	Sema,
-	air::{self, Param},
+	air::{self},
 };
 
 impl<'tcx> Sema<'tcx> {
@@ -54,7 +54,7 @@ impl<'tcx> Sema<'tcx> {
 					let expr = self.build_expr(arg);
 
 					self.add_stmt(air::Stmt::Assign(air::Assign {
-						var: air::Var::Ret,
+						var: self.get_current_function_ret(),
 						expr,
 					}));
 				}
@@ -77,8 +77,16 @@ impl<'tcx> Sema<'tcx> {
 				for var_declarator in &var.decls {
 					if let Some(init) = &var_declarator.init {
 						let expr = self.build_expr(init);
-						let id = var_declarator.name.clone().expect_ident().to_id();
-						let var = air::Var::Id(id);
+						let binding = match &var_declarator.name {
+							Pat::Ident(ident) => ident,
+							_ => unimplemented!("{:#?}", var_declarator.name),
+						};
+						let id = binding.to_id();
+						let ty = binding
+							.type_ann
+							.as_ref()
+							.map(|type_ann| self.ty_builder.build_tstype(&type_ann.type_ann));
+						let var = air::Var { id, ty };
 
 						let stmt = air::Stmt::Assign(air::Assign { var, expr });
 
@@ -98,7 +106,7 @@ impl<'tcx> Sema<'tcx> {
 			ident, function, ..
 		} = fn_decl;
 
-		let id = ident.to_id();
+		let function_id = ident.to_id();
 
 		let mut params = vec![];
 
@@ -114,7 +122,7 @@ impl<'tcx> Sema<'tcx> {
 						}
 					};
 
-					params.push(Param { id, ty });
+					params.push(air::Var { id, ty: Some(ty) });
 				}
 				_ => unimplemented!("{:#?}", param),
 			}
@@ -127,13 +135,14 @@ impl<'tcx> Sema<'tcx> {
 				self.tcx.new_ty(crate::TyKind::Void)
 			}
 		};
+		let ret = air::Var::new_ret(&function_id, ret_ty);
 
 		let body = match &function.body {
 			Some(body) => body,
 			None => panic!("Function body is required"),
 		};
 
-		self.start_function(id.clone(), params, ret_ty);
+		self.start_function(function_id, params, ret);
 
 		for stmt in &body.stmts {
 			self.build_stmt(stmt);
@@ -142,11 +151,22 @@ impl<'tcx> Sema<'tcx> {
 		self.finish_function();
 	}
 
-	fn build_expr(&self, expr: &Expr) -> air::Expr {
+	fn build_expr(&self, expr: &Expr) -> air::Expr<'tcx> {
 		match expr {
 			Expr::Assign(assign) => {
-				let id = assign.left.clone().expect_simple().expect_ident().to_id();
-				let var = air::Var::Id(id);
+				let binding = match &assign.left {
+					AssignTarget::Simple(target) => match &target {
+						SimpleAssignTarget::Ident(ident) => ident,
+						_ => unimplemented!("{:#?}", target),
+					},
+					_ => unimplemented!("{:#?}", assign.left),
+				};
+				let id = binding.to_id();
+				let ty = binding
+					.type_ann
+					.as_ref()
+					.map(|type_ann| self.ty_builder.build_tstype(&type_ann.type_ann));
+				let var = air::Var { id, ty };
 
 				self.add_stmt(air::Stmt::Assign(air::Assign {
 					var: var.clone(),
@@ -174,7 +194,7 @@ impl<'tcx> Sema<'tcx> {
 			}),
 			Expr::Ident(ident) => {
 				let id = ident.to_id();
-				let var = air::Var::Id(id);
+				let var = air::Var { id, ty: None };
 
 				air::Expr::Var(var)
 			}

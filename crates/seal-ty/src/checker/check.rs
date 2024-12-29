@@ -1,55 +1,46 @@
 use crate::{
 	Ty, TyKind,
 	kind::FunctionTy,
-	sema::air::{Assign, Block, Const, Expr, Function, Module, Stmt, Var},
+	sema::air::{Assign, Block, Const, Expr, Function, Module, Stmt},
 };
 
 use super::TypeChecker;
 
 impl<'tcx> TypeChecker<'tcx> {
 	pub fn check(&'tcx self, module: &Module<'tcx>) {
+		dbg!(module);
 		for function in &module.functions {
 			self.check_function(function);
 		}
 	}
 
 	pub fn check_function(&'tcx self, function: &Function<'tcx>) {
-		self.enter_function(function);
+		let mut param_tys = vec![];
 
 		for param in &function.params {
-			self.tcx.set_ty(param.id.clone(), param.ty);
+			let ty = param.ty.unwrap();
+			param_tys.push(ty);
+			self.tcx.set_ty(param.id.clone(), ty);
 		}
 
-		self.set_ret_ty(function.ret_ty);
+		let ret_ty = function.ret.ty.unwrap();
+		self.tcx.set_ty(function.ret.id.clone(), ret_ty);
 
 		for block in &function.body {
 			self.check_block(block);
 		}
 
-		if !function.ret_ty.is_void() {
+		if !ret_ty.is_void() {
 			// TODO: 'has_returned' flag
 			let has_assigned_to_ret = function.body.iter().any(|block| {
-				block
-					.stmts
-					.iter()
-					.any(|stmt| matches!(stmt, Stmt::Assign(Assign { var: Var::Ret, .. })))
+				block.stmts.iter().any(|stmt| match stmt {
+					Stmt::Assign(Assign { var, .. }) => var.is_ret(),
+					_ => false,
+				})
 			});
 
 			if !has_assigned_to_ret {
 				panic!("Function does not return");
-			}
-		}
-
-		let param_tys = function
-			.params
-			.iter()
-			.map(|param| param.ty)
-			.collect::<Vec<_>>();
-		let ret_ty = function.ret_ty;
-
-		for ty in param_tys.iter().chain(std::iter::once(&ret_ty)) {
-			if let TyKind::Infer(id) = ty.kind() {
-				self.tcx.infer.unify(*id);
 			}
 		}
 
@@ -71,25 +62,11 @@ impl<'tcx> TypeChecker<'tcx> {
 		match stmt {
 			Stmt::Assign(Assign { var, expr }) => {
 				let actual_ty = self.build_expr(expr);
-
-				let expected_ty = match var {
-					Var::Id(id) => match self.tcx.get_ty(id) {
-						Some(ty) => ty,
-						None => {
-							self.tcx.set_ty(id.clone(), actual_ty);
-							return;
-						}
-					},
-					Var::Ret => {
-						let ty = self.get_ret_ty();
-
-						if let TyKind::Infer(id) = ty.kind() {
-							self.tcx.infer.add_constraint(*id, actual_ty);
-
-							return;
-						}
-
-						ty
+				let expected_ty = match self.tcx.get_ty(&var.id) {
+					Some(ty) => ty,
+					None => {
+						self.tcx.set_ty(var.id.clone(), actual_ty);
+						return;
 					}
 				};
 
@@ -118,16 +95,13 @@ impl<'tcx> TypeChecker<'tcx> {
 				Const::Number(_) => self.tcx.new_ty(TyKind::Number),
 				Const::String(_) => self.tcx.new_ty(TyKind::String),
 			},
-			Expr::Var(var) => match var {
-				Var::Id(id) => {
-					if let Some(ty) = self.tcx.get_ty(id) {
-						ty
-					} else {
-						panic!("Type not found: {:?}", id);
-					}
+			Expr::Var(var) => {
+				if let Some(ty) = self.tcx.get_ty(&var.id) {
+					ty
+				} else {
+					panic!("Type not found: {:?}", var.id);
 				}
-				Var::Ret => self.get_ret_ty(),
-			},
+			}
 		}
 	}
 

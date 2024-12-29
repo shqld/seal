@@ -7,9 +7,9 @@ use swc_atoms::Atom;
 use swc_common::SyntaxContext;
 use swc_ecma_ast::Id;
 
-use air::{Block, BlockId, Function, Module, Param, Stmt, Term};
+use air::{Block, BlockId, Function, Module, Stmt, Term, Var};
 
-use crate::{Ty, TyKind, context::TyContext, type_builder::TypeBuilder};
+use crate::{TyKind, context::TyContext, type_builder::TypeBuilder};
 
 pub struct Sema<'tcx> {
 	tcx: &'tcx TyContext<'tcx>,
@@ -32,12 +32,15 @@ impl<'tcx> Sema<'tcx> {
 			function_stack: RefCell::new(vec![Function {
 				id: main_function_id.clone(),
 				params: vec![],
+				ret: Var {
+					id: (Atom::new("@ret"), main_function_id.1),
+					ty: Some(tcx.new_ty(TyKind::Void)),
+				},
 				body: vec![Block {
 					id: BlockId(0),
 					stmts: vec![],
 					term: None,
 				}],
-				ret_ty: tcx.new_ty(TyKind::Void),
 			}]),
 		}
 	}
@@ -78,7 +81,7 @@ impl<'tcx> Sema<'tcx> {
 		}
 	}
 
-	pub fn finish_block(&self, term: Option<Term>) {
+	pub fn finish_block(&self, term: Option<Term<'tcx>>) {
 		if let Some(function) = self.function_stack.borrow_mut().last_mut() {
 			if let Some(block) = function.body.last_mut() {
 				if block.term.is_none() {
@@ -88,12 +91,12 @@ impl<'tcx> Sema<'tcx> {
 		}
 	}
 
-	pub fn start_function(&self, id: Id, params: Vec<Param<'tcx>>, ret_ty: Ty<'tcx>) {
+	pub fn start_function(&self, id: Id, params: Vec<Var<'tcx>>, ret: Var<'tcx>) {
 		let func = Function {
 			id,
 			params,
+			ret,
 			body: vec![self.new_block()],
-			ret_ty,
 		};
 
 		self.function_stack.borrow_mut().push(func);
@@ -111,5 +114,9 @@ impl<'tcx> Sema<'tcx> {
 
 	pub fn is_current_function_main(&self) -> bool {
 		self.function_stack.borrow().len() == 1
+	}
+
+	pub fn get_current_function_ret(&self) -> Var<'tcx> {
+		self.function_stack.borrow().last().unwrap().ret.clone()
 	}
 }

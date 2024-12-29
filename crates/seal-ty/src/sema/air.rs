@@ -11,16 +11,9 @@ pub struct Module<'tcx> {
 #[derive(Debug, Clone)]
 pub struct Function<'tcx> {
 	pub id: Id,
-	pub params: Vec<Param<'tcx>>,
+	pub params: Vec<Var<'tcx>>,
+	pub ret: Var<'tcx>,
 	pub body: Vec<Block<'tcx>>,
-	pub ret_ty: Ty<'tcx>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Param<'tcx> {
-	// TODO: Var?
-	pub id: Id,
-	pub ty: Ty<'tcx>,
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -30,38 +23,52 @@ pub struct BlockId(pub usize);
 pub struct Block<'tcx> {
 	pub id: BlockId,
 	pub stmts: Vec<Stmt<'tcx>>,
-	pub term: Option<Term>,
+	pub term: Option<Term<'tcx>>,
 }
 
 #[derive(Debug, Clone)]
-pub enum Term {
+pub enum Term<'tcx> {
 	Return,
 	Goto(BlockId),
-	Switch(Expr, BlockId, BlockId),
+	Switch(Expr<'tcx>, BlockId, BlockId),
 }
 
 #[derive(Debug, Clone)]
 pub enum Stmt<'tcx> {
-	Assign(Assign),
-	Expr(Expr),
-	Satisfies(Expr, Ty<'tcx>),
+	Assign(Assign<'tcx>),
+	Expr(Expr<'tcx>),
+	Satisfies(Expr<'tcx>, Ty<'tcx>),
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Var {
-	Id(Id),
-	Ret,
+pub struct Var<'tcx> {
+	pub id: Id,
+	// TODO: move to 'Assign'
+	pub ty: Option<Ty<'tcx>>,
+}
+
+impl<'tcx> Var<'tcx> {
+	pub fn new_ret(function_id: &Id, ty: Ty<'tcx>) -> Self {
+		Self {
+			id: (Atom::new("@ret"), function_id.1),
+			ty: Some(ty),
+		}
+	}
+
+	pub fn is_ret(&self) -> bool {
+		self.id.0 == Atom::new("@ret")
+	}
 }
 
 #[derive(Debug, Clone)]
-pub struct Assign {
-	pub var: Var,
-	pub expr: Expr,
+pub struct Assign<'tcx> {
+	pub var: Var<'tcx>,
+	pub expr: Expr<'tcx>,
 }
 
 #[derive(Debug, Clone)]
-pub enum Expr {
-	Var(Var),
+pub enum Expr<'tcx> {
+	Var(Var<'tcx>),
 	Const(Const),
 }
 
