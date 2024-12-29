@@ -33,3 +33,21 @@ fail!(
         return 42;
     "#
 );
+
+fail!(
+	no_function_param_type_ann_1_,
+	r#"
+        function f(x): number {
+            return 42;
+        }
+    "#
+);
+
+fail!(
+	no_function_param_type_ann_2_,
+	r#"
+        function f(x, y, z): number {
+            return 42;
+        }
+    "#
+);

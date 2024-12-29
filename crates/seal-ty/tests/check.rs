@@ -147,55 +147,31 @@ fail!(
 );
 
 pass!(
-	infer_function_param_,
+	void_function_no_ret_type_ann_1_,
 	r#"
-        function f(n /* infer */): number {
-            return n;
+        function f() {
+            return;
         }
 
-        f satisfies (n: number) => number;
+        f satisfies () => void;
     "#
 );
 
 pass!(
-	infer_function_param_assgined_to_var_,
+	void_function_no_ret_type_ann_2_,
 	r#"
-        function f(n): number {
-            let x = n;
-            return x;
+        function f() {
         }
+
+        f satisfies () => void;
     "#
 );
 
 fail!(
-	inferred_function_param_mismatch_,
+	function_no_ret_type_ann_,
 	r#"
-        function f(n): number {
-            return n;
+        function f() {
+            return 42;
         }
-
-        f satisfies (n: string) => number;
-    "#
-);
-
-pass!(
-	infer_function_ret_,
-	r#"
-        function f(n: number) /* infer */ {
-            return n;
-        }
-
-        f satisfies (n: number) => number;
-    "#
-);
-
-fail!(
-	infer_function_ret_mismatch_,
-	r#"
-        function f(n: number) {
-            return n;
-        }
-
-        f satisfies (n: number) => string;
     "#
 );

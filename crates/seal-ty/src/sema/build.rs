@@ -108,9 +108,10 @@ impl<'tcx> Sema<'tcx> {
 					let id = ident.to_id();
 
 					let ty = match &ident.type_ann {
-						Some(ty) => self.ty_builder.build_tstype(&ty.type_ann),
-						// TODO: Param.ty should be Option<Ty>?
-						None => self.tcx.new_infer_ty(),
+						Some(type_ann) => self.ty_builder.build_tstype(&type_ann.type_ann),
+						None => {
+							panic!("Param type annotation is required");
+						}
 					};
 
 					params.push(Param { id, ty });
@@ -119,12 +120,13 @@ impl<'tcx> Sema<'tcx> {
 			}
 		}
 
-		let ret_ty = function
-			.return_type
-			.as_ref()
-			.map(|rt| self.ty_builder.build_tstype(&rt.type_ann))
-			// TODO: Function.ret_ty should be Option<Ty>?
-			.unwrap_or(self.tcx.new_infer_ty());
+		let ret_ty = match &function.return_type {
+			Some(type_ann) => self.ty_builder.build_tstype(&type_ann.type_ann),
+			None => {
+				// NOTE: seal does't infer the return type
+				self.tcx.new_ty(crate::TyKind::Void)
+			}
+		};
 
 		let body = match &function.body {
 			Some(body) => body,
