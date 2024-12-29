@@ -44,9 +44,10 @@ pass!(
 );
 
 pass!(
-	let_uninitialized_,
+	assign_to_uninitialized_var_,
 	r#"
-        let a; a = 1;
+        let a;
+        a = 1;
         a satisfies number;
     "#
 );
@@ -55,6 +56,15 @@ fail!(
 	assign_,
 	r#"
         let a = 1;
+        a = "hello";
+    "#
+);
+
+fail!(
+	assign_to_initialized_var_that_was_originally_uninitialized_,
+	r#"
+        let a;
+        a = 1;
         a = "hello";
     "#
 );
@@ -124,6 +134,14 @@ fail!(
 	r#"
         function f(n: number): number {
             return;
+        }
+    "#
+);
+
+fail!(
+	function_ret_mismatch_3_,
+	r#"
+        function f(n: number): number {
         }
     "#
 );
