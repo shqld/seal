@@ -11,7 +11,7 @@ impl<'tcx> TypeBuilder<'tcx> {
 		TypeBuilder { tcx }
 	}
 
-	pub fn build_tstype(&'tcx self, tstype: &TsType) -> Ty<'tcx> {
+	pub fn build_tstype(&self, tstype: &TsType) -> Ty<'tcx> {
 		self.tcx.new_ty(match tstype {
 			TsType::TsKeywordType(keyword) => match keyword.kind {
 				TsKeywordTypeKind::TsNumberKeyword => TyKind::Number,

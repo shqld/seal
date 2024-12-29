@@ -9,7 +9,7 @@ use super::{
 };
 
 impl<'tcx> Sema<'tcx> {
-	pub fn build(&'tcx self, ast: &Program) -> air::Module<'tcx> {
+	pub fn build(self, ast: &Program) -> air::Module<'tcx> {
 		let stmts = match &ast {
 			Program::Script(script) => &script.body,
 			Program::Module(module) => &module
@@ -29,11 +29,10 @@ impl<'tcx> Sema<'tcx> {
 
 		self.finish_function();
 
-		// TODO:
-		self.module.borrow().clone()
+		self.module.into_inner()
 	}
 
-	fn build_stmt(&'tcx self, stmt: &Stmt) {
+	fn build_stmt(&self, stmt: &Stmt) {
 		match stmt {
 			Stmt::Decl(decl) => self.build_decl(decl),
 			Stmt::Expr(ExprStmt { expr, .. }) => {
@@ -66,7 +65,7 @@ impl<'tcx> Sema<'tcx> {
 		}
 	}
 
-	fn build_decl(&'tcx self, decl: &Decl) {
+	fn build_decl(&self, decl: &Decl) {
 		match decl {
 			Decl::Var(var) => {
 				let _is_const = match var.kind {
@@ -94,7 +93,7 @@ impl<'tcx> Sema<'tcx> {
 		}
 	}
 
-	fn build_fn_decl(&'tcx self, fn_decl: &FnDecl) {
+	fn build_fn_decl(&self, fn_decl: &FnDecl) {
 		let FnDecl {
 			ident, function, ..
 		} = fn_decl;
@@ -141,7 +140,7 @@ impl<'tcx> Sema<'tcx> {
 		self.finish_function();
 	}
 
-	fn build_expr(&'tcx self, expr: &Expr) -> air::Expr {
+	fn build_expr(&self, expr: &Expr) -> air::Expr {
 		match expr {
 			Expr::Assign(assign) => {
 				let id = assign.left.clone().expect_simple().expect_ident().to_id();

@@ -16,7 +16,7 @@ pub struct Sema<'tcx> {
 	ty_builder: TypeBuilder<'tcx>,
 	global_block_counter: Cell<usize>,
 	module: RefCell<Module<'tcx>>,
-	functions: RefCell<Vec<Function<'tcx>>>,
+	function_stack: RefCell<Vec<Function<'tcx>>>,
 }
 
 impl<'tcx> Sema<'tcx> {
@@ -29,7 +29,7 @@ impl<'tcx> Sema<'tcx> {
 			ty_builder: type_builder,
 			global_block_counter: Cell::new(1),
 			module: RefCell::new(Module { functions: vec![] }),
-			functions: RefCell::new(vec![Function {
+			function_stack: RefCell::new(vec![Function {
 				id: main_function_id.clone(),
 				params: vec![],
 				body: vec![Block {
@@ -42,7 +42,7 @@ impl<'tcx> Sema<'tcx> {
 		}
 	}
 
-	pub fn new_block(&self) -> Block {
+	pub fn new_block(&self) -> Block<'tcx> {
 		let val = self.global_block_counter.get() + 1;
 
 		self.global_block_counter.set(val);
@@ -55,17 +55,17 @@ impl<'tcx> Sema<'tcx> {
 	}
 
 	pub fn add_block(&self, block: Block<'tcx>) {
-		if let Some(function) = self.functions.borrow_mut().last_mut() {
+		if let Some(function) = self.function_stack.borrow_mut().last_mut() {
 			function.body.push(block);
 		}
 	}
 
-	pub fn start_block(&'tcx self) {
+	pub fn start_block(&self) {
 		self.add_block(self.new_block());
 	}
 
-	pub fn add_stmt(&'tcx self, stmt: Stmt<'tcx>) {
-		if let Some(function) = self.functions.borrow_mut().last_mut() {
+	pub fn add_stmt(&self, stmt: Stmt<'tcx>) {
+		if let Some(function) = self.function_stack.borrow_mut().last_mut() {
 			if let Some(block) = function.body.last_mut() {
 				if block.term.is_some() {
 					let mut block = self.new_block();
@@ -79,7 +79,7 @@ impl<'tcx> Sema<'tcx> {
 	}
 
 	pub fn finish_block(&self, term: Option<Term>) {
-		if let Some(function) = self.functions.borrow_mut().last_mut() {
+		if let Some(function) = self.function_stack.borrow_mut().last_mut() {
 			if let Some(block) = function.body.last_mut() {
 				if block.term.is_none() {
 					block.term = term;
@@ -88,7 +88,7 @@ impl<'tcx> Sema<'tcx> {
 		}
 	}
 
-	pub fn start_function(&'tcx self, id: Id, params: Vec<Param<'tcx>>, ret_ty: Ty<'tcx>) {
+	pub fn start_function(&self, id: Id, params: Vec<Param<'tcx>>, ret_ty: Ty<'tcx>) {
 		let func = Function {
 			id,
 			params,
@@ -96,13 +96,13 @@ impl<'tcx> Sema<'tcx> {
 			ret_ty,
 		};
 
-		self.functions.borrow_mut().push(func);
+		self.function_stack.borrow_mut().push(func);
 	}
 
 	pub fn finish_function(&self) {
 		self.finish_block(Some(Term::Return));
 
-		if let Some(function) = self.functions.borrow_mut().pop() {
+		if let Some(function) = self.function_stack.borrow_mut().pop() {
 			self.module.borrow_mut().functions.push(function);
 		} else {
 			panic!("No function to finish");
@@ -110,6 +110,6 @@ impl<'tcx> Sema<'tcx> {
 	}
 
 	pub fn is_current_function_main(&self) -> bool {
-		self.functions.borrow().len() == 1
+		self.function_stack.borrow().len() == 1
 	}
 }
