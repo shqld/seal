@@ -1,7 +1,6 @@
 pub mod check;
 pub mod parse;
 mod satisfies;
-pub mod scope;
 
 use std::cell::Cell;
 

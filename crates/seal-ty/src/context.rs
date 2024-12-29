@@ -4,11 +4,10 @@ use swc_ecma_ast::Id;
 
 use crate::{Ty, TyKind, infer::InferContext, interner::interner::Interner};
 
+#[derive(Debug)]
 pub struct TyContext<'tcx> {
 	pub interner: Interner<'tcx, TyKind<'tcx>>,
-	// TODO: rename to 'types'
-	map: RefCell<HashMap<Id, Ty<'tcx>>>,
-
+	pub types: RefCell<HashMap<Id, Ty<'tcx>>>,
 	pub infer: InferContext<'tcx>,
 }
 
@@ -18,7 +17,7 @@ impl<'tcx> TyContext<'tcx> {
 		Self {
 			interner: Interner::new(),
 			infer: InferContext::new(),
-			map: RefCell::new(HashMap::new()),
+			types: RefCell::new(HashMap::new()),
 		}
 	}
 
@@ -32,10 +31,10 @@ impl<'tcx> TyContext<'tcx> {
 	}
 
 	pub fn get_ty(&self, id: &Id) -> Option<Ty<'tcx>> {
-		self.map.borrow().get(id).cloned()
+		self.types.borrow().get(id).cloned()
 	}
 
 	pub fn set_ty(&self, id: Id, ty: Ty<'tcx>) {
-		self.map.borrow_mut().insert(id, ty);
+		self.types.borrow_mut().insert(id, ty);
 	}
 }

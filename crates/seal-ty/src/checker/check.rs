@@ -83,7 +83,7 @@ impl<'tcx> TypeChecker<'tcx> {
 				};
 
 				if !self.satisfies(expected_ty, actual_ty) {
-					panic!("Type mismatch");
+					self.raise_type_error(expected_ty, actual_ty);
 				}
 			}
 			Stmt::Expr(expr) => {
@@ -94,7 +94,7 @@ impl<'tcx> TypeChecker<'tcx> {
 				let actual_ty = self.build_expr(expr);
 
 				if !self.satisfies(expected_ty, actual_ty) {
-					panic!("Type mismatch");
+					self.raise_type_error(expected_ty, actual_ty);
 				}
 			}
 		}
@@ -118,5 +118,11 @@ impl<'tcx> TypeChecker<'tcx> {
 				Var::Ret => self.get_ret_ty(),
 			},
 		}
+	}
+
+	pub fn raise_type_error(&self, expected: Ty<'tcx>, actual: Ty<'tcx>) {
+		dbg!(&self.tcx.types);
+
+		panic!("Type mismatch: expected {expected}, got {actual}");
 	}
 }

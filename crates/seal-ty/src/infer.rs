@@ -16,6 +16,7 @@ impl Display for InferId {
 	}
 }
 
+#[derive(Debug)]
 pub struct InferContext<'tcx> {
 	// TODO: infer_constraints
 	constraints: RefCell<Vec<(InferId, Ty<'tcx>)>>,

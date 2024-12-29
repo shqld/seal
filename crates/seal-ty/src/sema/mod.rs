@@ -14,7 +14,7 @@ use crate::{Ty, TyKind, context::TyContext, type_builder::TypeBuilder};
 pub struct Sema<'tcx> {
 	tcx: &'tcx TyContext<'tcx>,
 	ty_builder: TypeBuilder<'tcx>,
-	block_counter: Cell<usize>,
+	global_block_counter: Cell<usize>,
 	module: RefCell<Module<'tcx>>,
 	functions: RefCell<Vec<Function<'tcx>>>,
 }
@@ -27,7 +27,7 @@ impl<'tcx> Sema<'tcx> {
 		Sema {
 			tcx,
 			ty_builder: type_builder,
-			block_counter: Cell::new(1),
+			global_block_counter: Cell::new(1),
 			module: RefCell::new(Module { functions: vec![] }),
 			functions: RefCell::new(vec![Function {
 				id: main_function_id.clone(),
@@ -43,10 +43,9 @@ impl<'tcx> Sema<'tcx> {
 	}
 
 	pub fn new_block(&self) -> Block {
-		// TODO: get block count from tcx.module
-		let val = self.block_counter.get() + 1;
+		let val = self.global_block_counter.get() + 1;
 
-		self.block_counter.set(val);
+		self.global_block_counter.set(val);
 
 		Block {
 			id: BlockId(val),
