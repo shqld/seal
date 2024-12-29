@@ -7,18 +7,18 @@ impl<'tcx> TypeChecker<'tcx> {
 		use crate::TyKind::*;
 
 		match (expected.kind(), actual.kind()) {
+			// e.g. function return type
 			(Infer(id), _) => match self.tcx.infer.resolve_ty(*id) {
 				Some(expected) => self.satisfies(expected, actual),
 				None => {
 					panic!("Expecting unresolved infer type");
 				}
 			},
+			// e.g. function param types
 			(_, Infer(id)) => match self.tcx.infer.resolve_ty(*id) {
 				Some(actual) => self.satisfies(expected, actual),
 				None => {
 					self.tcx.infer.add_constraint(*id, expected);
-					// TODO: unify when function scope ends
-					self.tcx.infer.unify(*id, expected);
 
 					true
 				}

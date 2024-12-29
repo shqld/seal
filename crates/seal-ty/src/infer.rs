@@ -18,8 +18,7 @@ impl Display for InferId {
 
 #[derive(Debug)]
 pub struct InferContext<'tcx> {
-	// TODO: infer_constraints
-	constraints: RefCell<Vec<(InferId, Ty<'tcx>)>>,
+	constraints: RefCell<HashMap<InferId, Vec<Ty<'tcx>>>>,
 	infer_count: Cell<usize>,
 	map: RefCell<HashMap<InferId, Ty<'tcx>>>,
 }
@@ -27,7 +26,7 @@ pub struct InferContext<'tcx> {
 impl<'tcx> InferContext<'tcx> {
 	pub fn new() -> Self {
 		Self {
-			constraints: RefCell::new(Vec::new()),
+			constraints: RefCell::new(HashMap::new()),
 			infer_count: Cell::new(0),
 			map: RefCell::new(HashMap::new()),
 		}
@@ -41,10 +40,33 @@ impl<'tcx> InferContext<'tcx> {
 	}
 
 	pub fn add_constraint(&self, id: InferId, ty: Ty<'tcx>) {
-		self.constraints.borrow_mut().push((id, ty));
+		let mut constraints = self.constraints.borrow_mut();
+
+		constraints.entry(id).or_default().push(ty);
 	}
 
-	pub fn unify(&self, id: InferId, ty: Ty<'tcx>) {
+	pub fn unify(&self, id: InferId) -> Ty<'tcx> {
+		let constraints = self
+			.constraints
+			.borrow_mut()
+			.remove(&id)
+			.expect("No constraints found for the given InferId");
+
+		let mut constraints = constraints.into_iter().map(|ty| match ty.kind() {
+			crate::TyKind::Infer(id) => self.unify(*id),
+			_ => ty,
+		});
+
+		let ty = constraints
+			.next()
+			.expect("No constraints found for the given InferId");
+
+		for constraint in constraints {
+			if constraint != ty {
+				panic!("Unification failed: {:?} != {:?}", ty, constraint);
+			}
+		}
+
 		let mut map = self.map.borrow_mut();
 
 		if let Entry::Vacant(e) = map.entry(id) {
@@ -52,6 +74,8 @@ impl<'tcx> InferContext<'tcx> {
 		} else {
 			panic!("Infer type already resolved: {:?}", id);
 		}
+
+		ty
 	}
 
 	pub fn resolve_ty(&self, id: InferId) -> Option<Ty<'tcx>> {

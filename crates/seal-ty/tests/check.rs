@@ -149,11 +149,21 @@ fail!(
 pass!(
 	infer_function_param_,
 	r#"
-        function f(n): number {
+        function f(n /* infer */): number {
             return n;
         }
 
         f satisfies (n: number) => number;
+    "#
+);
+
+pass!(
+	infer_function_param_assgined_to_var_,
+	r#"
+        function f(n): number {
+            let x = n;
+            return x;
+        }
     "#
 );
 
@@ -171,7 +181,7 @@ fail!(
 pass!(
 	infer_function_ret_,
 	r#"
-        function f(n: number) {
+        function f(n: number) /* infer */ {
             return n;
         }
 

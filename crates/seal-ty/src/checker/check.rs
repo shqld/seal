@@ -40,9 +40,22 @@ impl<'tcx> TypeChecker<'tcx> {
 			}
 		}
 
+		let param_tys = function
+			.params
+			.iter()
+			.map(|param| param.ty)
+			.collect::<Vec<_>>();
+		let ret_ty = function.ret_ty;
+
+		for ty in param_tys.iter().chain(std::iter::once(&ret_ty)) {
+			if let TyKind::Infer(id) = ty.kind() {
+				self.tcx.infer.unify(*id);
+			}
+		}
+
 		let ty = self.tcx.new_ty(TyKind::Function(FunctionTy {
-			params: function.params.iter().map(|param| param.ty).collect(),
-			ret: function.ret_ty,
+			params: param_tys,
+			ret: ret_ty,
 		}));
 
 		self.tcx.set_ty(function.id.clone(), ty);
@@ -72,8 +85,6 @@ impl<'tcx> TypeChecker<'tcx> {
 
 						if let TyKind::Infer(id) = ty.kind() {
 							self.tcx.infer.add_constraint(*id, actual_ty);
-							// TODO: unify when function scope ends
-							self.tcx.infer.unify(*id, actual_ty);
 
 							return;
 						}
