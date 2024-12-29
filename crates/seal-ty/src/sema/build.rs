@@ -47,6 +47,10 @@ impl<'tcx> Sema<'tcx> {
 				}
 			}
 			Stmt::Return(ReturnStmt { arg, .. }) => {
+				if self.is_current_function_main() {
+					panic!("Cannot return on main");
+				}
+
 				if let Some(arg) = arg {
 					let expr = self.build_expr(arg);
 

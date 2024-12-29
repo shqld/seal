@@ -108,4 +108,8 @@ impl<'tcx> Sema<'tcx> {
 			panic!("No function to finish");
 		}
 	}
+
+	pub fn is_current_function_main(&self) -> bool {
+		self.functions.borrow().len() == 1
+	}
 }
