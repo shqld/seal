@@ -1,12 +1,12 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use swc_atoms::Atom;
 use swc_ecma_ast::Id;
 
-use crate::{Ty, TyKind, checker::scope::Scope, infer::InferContext, interner::interner::Interner};
+use crate::{Ty, TyKind, infer::InferContext, interner::interner::Interner};
 
 pub struct TyContext<'tcx> {
-	interner: Interner<'tcx, TyKind<'tcx>>,
+	pub interner: Interner<'tcx, TyKind<'tcx>>,
+	// TODO: rename to 'types'
 	map: RefCell<HashMap<Id, Ty<'tcx>>>,
 
 	pub infer: InferContext<'tcx>,
@@ -31,18 +31,11 @@ impl<'tcx> TyContext<'tcx> {
 		Ty::new(self.interner.intern(TyKind::Infer(id)))
 	}
 
-	pub fn get_ty(&'tcx self, id: &Id) -> Option<Ty<'tcx>> {
+	pub fn get_ty(&self, id: &Id) -> Option<Ty<'tcx>> {
 		self.map.borrow().get(id).cloned()
 	}
 
-	pub fn set_ty(&'tcx self, id: Id, ty: Ty<'tcx>) {
+	pub fn set_ty(&self, id: Id, ty: Ty<'tcx>) {
 		self.map.borrow_mut().insert(id, ty);
-	}
-
-	pub fn get_ret_ty(&'tcx self, scope: &Scope) -> Option<Ty<'tcx>> {
-		self.get_ty(&(Atom::new("@ret"), scope.ctx))
-	}
-	pub fn set_ret_ty(&'tcx self, scope: &Scope, ty: Ty<'tcx>) {
-		self.set_ty((Atom::new("@ret"), scope.ctx), ty);
 	}
 }

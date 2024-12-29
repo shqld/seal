@@ -1,223 +1,122 @@
-use swc_ecma_ast::{
-	Decl, Expr, ExprStmt, FnDecl, Function, Lit, ModuleItem, Pat, Program, ReturnStmt, Stmt,
-	TsFnOrConstructorType, TsKeywordTypeKind, TsSatisfiesExpr, TsType, VarDeclKind,
+use crate::{
+	Ty, TyKind,
+	kind::FunctionTy,
+	sema::air::{Assign, Block, Const, Expr, Function, Module, Stmt, Var},
 };
 
-use crate::{Ty, TyKind, kind::FunctionTy};
+use super::TypeChecker;
 
-use super::Checker;
-
-impl<'tcx> Checker<'tcx> {
-	pub fn check(&'tcx self, ast: &Program) {
-		let stmts = match &ast {
-			Program::Script(script) => &script.body,
-			Program::Module(module) => &module
-				.body
-				.iter()
-				.filter_map(|item| match item {
-					ModuleItem::Stmt(stmt) => Some(stmt.clone()),
-					_ => None,
-				})
-				.collect::<Vec<_>>(),
-		};
-
-		for stmt in stmts {
-			self.check_stmt(stmt);
+impl<'tcx> TypeChecker<'tcx> {
+	pub fn check(&'tcx self, module: &Module<'tcx>) {
+		for function in &module.functions {
+			self.check_function(function);
 		}
 	}
 
-	fn check_stmt(&'tcx self, stmt: &Stmt) {
-		match stmt {
-			Stmt::Decl(decl) => self.check_decl(decl),
-			Stmt::Expr(ExprStmt { expr, .. }) => {
-				self.build_expr(expr);
-			}
-			Stmt::Return(ReturnStmt { arg, .. }) => {
-				let ret_ty = match arg {
-					Some(arg) => self.build_expr(arg),
-					None => self.tcx.new_ty(TyKind::Void),
-				};
+	pub fn check_function(&'tcx self, function: &Function<'tcx>) {
+		self.enter_function(function);
 
-				let scope = self.get_current_scope();
-				let expected_ty = self.tcx.get_ret_ty(&scope).unwrap();
-
-				if let TyKind::Infer(id) = expected_ty.kind() {
-					self.tcx.infer.add_constraint(*id, ret_ty);
-					// TODO: unify when function scope ends
-					self.tcx.infer.unify(*id, ret_ty);
-				}
-
-				if !self.satisfies(expected_ty, ret_ty) {
-					panic!("Return type mismatch");
-				}
-
-				scope.has_returned.set(true);
-			}
-			_ => unimplemented!("{:#?}", stmt),
-		}
-	}
-
-	fn check_decl(&'tcx self, decl: &Decl) {
-		match decl {
-			Decl::Var(var) => {
-				let _is_const = match var.kind {
-					VarDeclKind::Var => panic!("Var is not supported"),
-					VarDeclKind::Const => true,
-					VarDeclKind::Let => false,
-				};
-
-				for var_declarator in &var.decls {
-					if let Some(init) = &var_declarator.init {
-						let ty = self.build_expr(init);
-						let id = var_declarator.name.clone().expect_ident().to_id();
-
-						self.tcx.set_ty(id, ty);
-					}
-				}
-			}
-			Decl::Fn(FnDecl {
-				ident, function, ..
-			}) => {
-				let id = ident.to_id();
-
-				let ty = self.build_function(function);
-
-				self.tcx.set_ty(id, ty);
-			}
-			_ => unimplemented!("{:#?}", decl),
-		}
-	}
-
-	fn build_function(&'tcx self, function: &Function) -> Ty<'tcx> {
-		let ret_ty = function
-			.return_type
-			.as_ref()
-			.map(|rt| self.build_tstype(&rt.type_ann))
-			.unwrap_or(self.tcx.new_infer_ty());
-
-		let scope = self.push_scope(function.ctxt);
-		self.tcx.set_ret_ty(&scope, ret_ty);
-
-		let mut param_tys = vec![];
 		for param in &function.params {
-			match &param.pat {
-				Pat::Ident(ident) => {
-					let id = ident.to_id();
-					let ty = match &ident.type_ann {
-						Some(ty) => self.build_tstype(&ty.type_ann),
-						None => self.tcx.new_infer_ty(),
-					};
+			self.tcx.set_ty(param.id.clone(), param.ty);
+		}
 
-					self.tcx.set_ty(id, ty);
-					param_tys.push(ty);
-				}
-				_ => unimplemented!("{:#?}", param),
+		self.set_ret_ty(function.ret_ty);
+
+		for block in &function.body {
+			self.check_block(block);
+		}
+
+		if !function.ret_ty.is_void() {
+			// TODO: 'has_returned' flag
+			let has_assigned_to_ret = function.body.iter().any(|block| {
+				block
+					.stmts
+					.iter()
+					.any(|stmt| matches!(stmt, Stmt::Assign(Assign { var: Var::Ret, .. })))
+			});
+
+			if !has_assigned_to_ret {
+				panic!("Function does not return");
 			}
-		}
-
-		let body = match &function.body {
-			Some(body) => body,
-			None => panic!("Function body is required"),
-		};
-
-		for stmt in &body.stmts {
-			self.check_stmt(stmt);
-		}
-
-		if !scope.has_returned.get() && ret_ty != self.tcx.new_ty(TyKind::Void) {
-			panic!("Function does not return");
 		}
 
 		let ty = self.tcx.new_ty(TyKind::Function(FunctionTy {
-			params: param_tys,
-			ret: ret_ty,
+			params: function.params.iter().map(|param| param.ty).collect(),
+			ret: function.ret_ty,
 		}));
 
-		self.pop_scope();
-
-		ty
+		self.tcx.set_ty(function.id.clone(), ty);
 	}
 
-	fn build_expr(&'tcx self, expr: &Expr) -> Ty<'tcx> {
-		match expr {
-			Expr::Assign(assign) => {
-				let id = assign.left.clone().expect_simple().expect_ident().to_id();
-
-				let actual_ty = self.build_expr(&assign.right);
-
-				let ty = if let Some(expected_ty) = self.tcx.get_ty(&id) {
-					if !self.satisfies(expected_ty, actual_ty) {
-						panic!("Type mismatch");
-					}
-
-					expected_ty
-				} else {
-					self.tcx.set_ty(id, actual_ty);
-					actual_ty
-				};
-
-				ty
-			}
-			Expr::TsSatisfies(TsSatisfiesExpr { expr, type_ann, .. }) => {
-				let expected_ty = self.build_tstype(type_ann);
-				let actual_ty = self.build_expr(expr);
-
-				if !self.satisfies(expected_ty, actual_ty) {
-					dbg!(expected_ty, actual_ty);
-					panic!("Type mismatch");
-				}
-
-				actual_ty
-			}
-			Expr::Lit(lit) => self.tcx.new_ty(match lit {
-				Lit::Bool(_) => TyKind::Boolean,
-				Lit::Num(_) => TyKind::Number,
-				Lit::Str(_) => TyKind::String,
-				_ => unimplemented!(),
-			}),
-			Expr::Ident(ident) => {
-				let id = ident.to_id();
-
-				if let Some(ty) = self.tcx.get_ty(&id) {
-					ty
-				} else {
-					panic!("Type not found: {:?}", ident.sym);
-				}
-			}
-			_ => unimplemented!("{:#?}", expr),
+	pub fn check_block(&'tcx self, block: &Block<'tcx>) {
+		for stmt in &block.stmts {
+			self.check_stmt(stmt);
 		}
 	}
 
-	fn build_tstype(&'tcx self, tstype: &TsType) -> Ty<'tcx> {
-		self.tcx.new_ty(match tstype {
-			TsType::TsKeywordType(keyword) => match keyword.kind {
-				TsKeywordTypeKind::TsNumberKeyword => TyKind::Number,
-				TsKeywordTypeKind::TsStringKeyword => TyKind::String,
-				TsKeywordTypeKind::TsBooleanKeyword => TyKind::Boolean,
-				TsKeywordTypeKind::TsVoidKeyword => TyKind::Void,
-				_ => unimplemented!(),
-			},
-			TsType::TsFnOrConstructorType(fn_or_constructor) => match fn_or_constructor {
-				TsFnOrConstructorType::TsFnType(fn_) => {
-					let ret_ty = self.build_tstype(&fn_.type_ann.type_ann);
+	pub fn check_stmt(&'tcx self, stmt: &Stmt<'tcx>) {
+		match stmt {
+			Stmt::Assign(Assign { var, expr }) => {
+				let actual_ty = self.build_expr(expr);
 
-					let mut param_tys = vec![];
-					for param in &fn_.params {
-						let ty = self.build_tstype(
-							// TODO:
-							&param.clone().expect_ident().type_ann.unwrap().type_ann,
-						);
-						param_tys.push(ty);
+				let expected_ty = match var {
+					Var::Id(id) => match self.tcx.get_ty(id) {
+						Some(ty) => ty,
+						None => {
+							self.tcx.set_ty(id.clone(), actual_ty);
+							return;
+						}
+					},
+					Var::Ret => {
+						let ty = self.get_ret_ty();
+
+						if let TyKind::Infer(id) = ty.kind() {
+							self.tcx.infer.add_constraint(*id, actual_ty);
+							// TODO: unify when function scope ends
+							self.tcx.infer.unify(*id, actual_ty);
+
+							return;
+						}
+
+						ty
 					}
+				};
 
-					TyKind::Function(FunctionTy {
-						params: param_tys,
-						ret: ret_ty,
-					})
+				if !self.satisfies(expected_ty, actual_ty) {
+					panic!("Type mismatch");
 				}
-				_ => unimplemented!(),
+			}
+			Stmt::Expr(expr) => {
+				self.build_expr(expr);
+			}
+			Stmt::Satisfies(expr, ty) => {
+				let expected_ty = *ty;
+				let actual_ty = self.build_expr(expr);
+
+				if !self.satisfies(expected_ty, actual_ty) {
+					panic!("Type mismatch");
+				}
+			}
+		}
+	}
+
+	pub fn build_expr(&'tcx self, expr: &Expr) -> Ty<'tcx> {
+		match expr {
+			Expr::Const(val) => match val {
+				Const::Boolean(_) => self.tcx.new_ty(TyKind::Boolean),
+				Const::Number(_) => self.tcx.new_ty(TyKind::Number),
+				Const::String(_) => self.tcx.new_ty(TyKind::String),
 			},
-			_ => unimplemented!("{:#?}", tstype),
-		})
+			Expr::Var(var) => match var {
+				Var::Id(id) => {
+					if let Some(ty) = self.tcx.get_ty(id) {
+						ty
+					} else {
+						panic!("Type not found: {:?}", id);
+					}
+				}
+				Var::Ret => self.get_ret_ty(),
+			},
+		}
 	}
 }

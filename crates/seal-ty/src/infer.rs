@@ -54,7 +54,7 @@ impl<'tcx> InferContext<'tcx> {
 	}
 
 	pub fn resolve_ty(&self, id: InferId) -> Option<Ty<'tcx>> {
-		self.map.borrow_mut().get(&id).copied()
+		self.map.borrow().get(&id).copied()
 	}
 }
 

@@ -3,10 +3,13 @@ use swc_ecma_ast::{
 	VarDeclKind,
 };
 
-use super::{Sema, air};
+use super::{
+	Sema,
+	air::{self, Param},
+};
 
-impl Sema {
-	pub fn build(self, ast: &Program) -> air::Module {
+impl<'tcx> Sema<'tcx> {
+	pub fn build(&'tcx self, ast: &Program) -> air::Module<'tcx> {
 		let stmts = match &ast {
 			Program::Script(script) => &script.body,
 			Program::Module(module) => &module
@@ -24,12 +27,13 @@ impl Sema {
 			self.build_stmt(stmt);
 		}
 
-		air::Module {
-			functions: self.functions,
-		}
+		self.finish_function();
+
+		// TODO:
+		self.module.borrow().clone()
 	}
 
-	fn build_stmt(&self, stmt: &Stmt) {
+	fn build_stmt(&'tcx self, stmt: &Stmt) {
 		match stmt {
 			Stmt::Decl(decl) => self.build_decl(decl),
 			Stmt::Expr(ExprStmt { expr, .. }) => {
@@ -52,13 +56,13 @@ impl Sema {
 					}));
 				}
 
-				self.block.borrow_mut().term = Some(air::Term::Return);
+				self.finish_block(Some(air::Term::Return));
 			}
 			_ => unimplemented!("{:#?}", stmt),
 		}
 	}
 
-	fn build_decl(&self, decl: &Decl) {
+	fn build_decl(&'tcx self, decl: &Decl) {
 		match decl {
 			Decl::Var(var) => {
 				let _is_const = match var.kind {
@@ -73,7 +77,9 @@ impl Sema {
 						let id = var_declarator.name.clone().expect_ident().to_id();
 						let var = air::Var::Id(id);
 
-						self.add_stmt(air::Stmt::Assign(air::Assign { var, expr }));
+						let stmt = air::Stmt::Assign(air::Assign { var, expr });
+
+						self.add_stmt(stmt);
 					}
 				}
 			}
@@ -84,7 +90,7 @@ impl Sema {
 		}
 	}
 
-	fn build_fn_decl(&self, fn_decl: &FnDecl) {
+	fn build_fn_decl(&'tcx self, fn_decl: &FnDecl) {
 		let FnDecl {
 			ident, function, ..
 		} = fn_decl;
@@ -97,27 +103,41 @@ impl Sema {
 			match &param.pat {
 				Pat::Ident(ident) => {
 					let id = ident.to_id();
-					let var = air::Var::Id(id);
 
-					params.push(var);
+					let ty = match &ident.type_ann {
+						Some(ty) => self.ty_builder.build_tstype(&ty.type_ann),
+						// TODO: Param.ty should be Option<Ty>?
+						None => self.tcx.new_infer_ty(),
+					};
+
+					params.push(Param { id, ty });
 				}
 				_ => unimplemented!("{:#?}", param),
 			}
 		}
 
-		self.push_function(id, params);
+		let ret_ty = function
+			.return_type
+			.as_ref()
+			.map(|rt| self.ty_builder.build_tstype(&rt.type_ann))
+			// TODO: Function.ret_ty should be Option<Ty>?
+			.unwrap_or(self.tcx.new_infer_ty());
 
 		let body = match &function.body {
 			Some(body) => body,
 			None => panic!("Function body is required"),
 		};
 
+		self.start_function(id.clone(), params, ret_ty);
+
 		for stmt in &body.stmts {
 			self.build_stmt(stmt);
 		}
+
+		self.finish_function();
 	}
 
-	fn build_expr(&self, expr: &Expr) -> air::Expr {
+	fn build_expr(&'tcx self, expr: &Expr) -> air::Expr {
 		match expr {
 			Expr::Assign(assign) => {
 				let id = assign.left.clone().expect_simple().expect_ident().to_id();
@@ -130,8 +150,16 @@ impl Sema {
 
 				air::Expr::Var(var)
 			}
-			Expr::TsSatisfies(TsSatisfiesExpr { .. }) => {
-				unimplemented!()
+			Expr::TsSatisfies(TsSatisfiesExpr { expr, type_ann, .. }) => {
+				let expr = self.build_expr(expr);
+
+				self.add_stmt(air::Stmt::Satisfies(
+					// TODO:
+					expr.clone(),
+					self.ty_builder.build_tstype(type_ann),
+				));
+
+				expr
 			}
 			Expr::Lit(lit) => air::Expr::Const(match lit {
 				Lit::Bool(val) => air::Const::Boolean(val.value),

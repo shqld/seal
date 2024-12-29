@@ -3,39 +3,45 @@ pub mod parse;
 mod satisfies;
 pub mod scope;
 
-use std::{cell::RefCell, rc::Rc};
+use std::cell::Cell;
 
-use scope::Scope;
+use swc_atoms::Atom;
 use swc_common::SyntaxContext;
 
-use crate::context::TyContext;
+use crate::{Ty, TyKind, context::TyContext, sema::air::Function, type_builder::TypeBuilder};
 
-pub struct Checker<'tcx> {
-	pub tcx: TyContext<'tcx>,
-	pub scopes: RefCell<Vec<Rc<Scope>>>,
+pub struct TypeChecker<'tcx> {
+	tcx: &'tcx TyContext<'tcx>,
+	_ty_builder: TypeBuilder<'tcx>,
+	syntax_context: Cell<SyntaxContext>,
 }
 
-impl Checker<'_> {
-	pub fn new(tcx: TyContext) -> Checker {
-		Checker {
+impl<'tcx> TypeChecker<'tcx> {
+	pub fn new(tcx: &'tcx TyContext<'tcx>) -> TypeChecker<'tcx> {
+		let _ty_builder = TypeBuilder::new(tcx);
+		TypeChecker {
 			tcx,
-			scopes: RefCell::new(vec![]),
+			_ty_builder,
+			syntax_context: Cell::new(SyntaxContext::empty()),
 		}
 	}
 
-	pub fn push_scope(&self, ctx: SyntaxContext) -> Rc<Scope> {
-		let scope = Rc::new(Scope::new(ctx));
-
-		self.scopes.borrow_mut().push(scope.clone());
-
-		scope
+	pub fn new_ty(&'tcx self, kind: TyKind<'tcx>) -> Ty<'tcx> {
+		self.tcx.new_ty(kind)
 	}
 
-	pub fn get_current_scope(&self) -> Rc<Scope> {
-		self.scopes.borrow().last().unwrap().clone()
+	pub fn enter_function(&self, function: &Function<'tcx>) {
+		self.syntax_context.replace(function.id.1);
 	}
 
-	pub fn pop_scope(&self) {
-		self.scopes.borrow_mut().pop();
+	pub fn get_ret_ty(&self) -> Ty<'tcx> {
+		self.tcx
+			.get_ty(&(Atom::new("@ret"), self.syntax_context.get()))
+			.expect("Return type not found")
+	}
+
+	pub fn set_ret_ty(&self, ty: Ty<'tcx>) {
+		self.tcx
+			.set_ty((Atom::new("@ret"), self.syntax_context.get()), ty);
 	}
 }

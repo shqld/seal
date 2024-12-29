@@ -40,6 +40,10 @@ impl TyKind<'_> {
 	pub fn is_err(&self) -> bool {
 		matches!(self, TyKind::Err)
 	}
+
+	pub fn is_void(&self) -> bool {
+		matches!(self, TyKind::Void)
+	}
 }
 
 #[derive(Debug, Hash, PartialEq, Eq)]
