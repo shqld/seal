@@ -41,7 +41,7 @@ impl<'tcx> Sema<'tcx> {
 				match expr {
 					air::Expr::Var(_) => {}
 					_ => {
-						self.add_stmt(air::Stmt::Expr(expr));
+						self.add_expr_stmt(expr);
 					}
 				}
 			}
@@ -53,10 +53,7 @@ impl<'tcx> Sema<'tcx> {
 				if let Some(arg) = arg {
 					let expr = self.build_expr(arg);
 
-					self.add_stmt(air::Stmt::Assign(air::Assign {
-						var: self.get_current_function_ret().var().clone(),
-						expr,
-					}));
+					self.add_assign_stmt(self.get_current_function_ret().var().clone(), expr);
 				}
 
 				self.finish_block(Some(air::Term::Return));
@@ -87,12 +84,7 @@ impl<'tcx> Sema<'tcx> {
 						// 	.as_ref()
 						// 	.map(|type_ann| self.ty_builder.build_tstype(&type_ann.type_ann));
 
-						let stmt = air::Stmt::Assign(air::Assign {
-							var: air::Var { id },
-							expr,
-						});
-
-						self.add_stmt(stmt);
+						self.add_assign_stmt(air::Var { id }, expr);
 					}
 				}
 			}
@@ -182,21 +174,18 @@ impl<'tcx> Sema<'tcx> {
 				// 	.map(|type_ann| self.ty_builder.build_tstype(&type_ann.type_ann));
 				let var = air::Var { id };
 
-				self.add_stmt(air::Stmt::Assign(air::Assign {
-					var: var.clone(),
-					expr: self.build_expr(&assign.right),
-				}));
+				self.add_assign_stmt(var.clone(), self.build_expr(&assign.right));
 
 				air::Expr::Var(var)
 			}
 			Expr::TsSatisfies(TsSatisfiesExpr { expr, type_ann, .. }) => {
 				let expr = self.build_expr(expr);
 
-				self.add_stmt(air::Stmt::Satisfies(
+				self.add_satisfies_stmt(
 					// TODO:
 					expr.clone(),
 					self.ty_builder.build_tstype(type_ann),
-				));
+				);
 
 				expr
 			}

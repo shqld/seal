@@ -6,9 +6,9 @@ use std::cell::{Cell, RefCell};
 use swc_atoms::Atom;
 use swc_common::SyntaxContext;
 
-use air::{Block, BlockId, Function, Module, Stmt, Term, TypedVar};
+use air::{Block, BlockId, Function, Module, Stmt, Term, TypedVar, Var};
 
-use crate::{TyKind, context::TyContext, type_builder::TypeBuilder};
+use crate::{Ty, TyKind, context::TyContext, type_builder::TypeBuilder};
 
 pub struct Sema<'tcx> {
 	tcx: &'tcx TyContext<'tcx>,
@@ -66,20 +66,6 @@ impl<'tcx> Sema<'tcx> {
 		self.add_block(self.new_block());
 	}
 
-	pub fn add_stmt(&self, stmt: Stmt<'tcx>) {
-		if let Some(function) = self.function_stack.borrow_mut().last_mut() {
-			if let Some(block) = function.body.last_mut() {
-				if block.term.is_some() {
-					let mut block = self.new_block();
-					block.stmts.push(stmt);
-					function.body.push(block);
-				} else {
-					block.stmts.push(stmt);
-				}
-			}
-		}
-	}
-
 	pub fn finish_block(&self, term: Option<Term>) {
 		if let Some(function) = self.function_stack.borrow_mut().last_mut() {
 			if let Some(block) = function.body.last_mut() {
@@ -110,5 +96,31 @@ impl<'tcx> Sema<'tcx> {
 
 	pub fn get_current_function_ret(&self) -> TypedVar {
 		self.function_stack.borrow().last().unwrap().ret.clone()
+	}
+
+	pub fn add_stmt(&self, stmt: Stmt<'tcx>) {
+		if let Some(function) = self.function_stack.borrow_mut().last_mut() {
+			if let Some(block) = function.body.last_mut() {
+				if block.term.is_some() {
+					let mut block = self.new_block();
+					block.stmts.push(stmt);
+					function.body.push(block);
+				} else {
+					block.stmts.push(stmt);
+				}
+			}
+		}
+	}
+
+	pub fn add_assign_stmt(&self, var: Var, expr: air::Expr) {
+		self.add_stmt(Stmt::Assign(air::Assign { var, expr }));
+	}
+
+	pub fn add_expr_stmt(&self, expr: air::Expr) {
+		self.add_stmt(Stmt::Expr(expr));
+	}
+
+	pub fn add_satisfies_stmt(&self, expr: air::Expr, ty: Ty<'tcx>) {
+		self.add_stmt(Stmt::Satisfies(expr, ty));
 	}
 }
