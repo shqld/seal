@@ -1,7 +1,7 @@
 use crate::{
 	Ty, TyKind,
 	kind::FunctionTy,
-	sema::air::{Assign, Block, Const, Expr, Function, Module, Stmt},
+	sema::air::{Assign, Block, Const, Expr, Function, Module, Stmt, Var},
 };
 
 use super::TypeChecker;
@@ -18,18 +18,19 @@ impl<'tcx> TypeChecker<'tcx> {
 		let mut param_tys = vec![];
 
 		for param in &function.params {
-			let ty = param.ty.unwrap();
+			let ty = param.ty();
 			param_tys.push(ty);
-			self.tcx.set_ty(param.id.clone(), ty);
+			self.tcx.set_ty(param.var().id.clone(), ty);
 		}
 
-		let ret_ty = function.ret.ty.unwrap();
-		self.tcx.set_ty(function.ret.id.clone(), ret_ty);
+		let ret_ty = function.ret.ty();
+		self.tcx.set_ty(function.ret.var().id.clone(), ret_ty);
 
 		for block in &function.body {
 			self.check_block(block);
 		}
 
+		let ret_ty = self.tcx.get_ty(&Var::new_ret(&function.id).id).unwrap();
 		if !ret_ty.is_void() {
 			// TODO: 'has_returned' flag
 			let has_assigned_to_ret = function.body.iter().any(|block| {

@@ -54,7 +54,7 @@ impl<'tcx> Sema<'tcx> {
 					let expr = self.build_expr(arg);
 
 					self.add_stmt(air::Stmt::Assign(air::Assign {
-						var: self.get_current_function_ret(),
+						var: self.get_current_function_ret().var().clone(),
 						expr,
 					}));
 				}
@@ -82,13 +82,15 @@ impl<'tcx> Sema<'tcx> {
 							_ => unimplemented!("{:#?}", var_declarator.name),
 						};
 						let id = binding.to_id();
-						let ty = binding
-							.type_ann
-							.as_ref()
-							.map(|type_ann| self.ty_builder.build_tstype(&type_ann.type_ann));
-						let var = air::Var { id, ty };
+						// let ty = binding
+						// 	.type_ann
+						// 	.as_ref()
+						// 	.map(|type_ann| self.ty_builder.build_tstype(&type_ann.type_ann));
 
-						let stmt = air::Stmt::Assign(air::Assign { var, expr });
+						let stmt = air::Stmt::Assign(air::Assign {
+							var: air::Var { id },
+							expr,
+						});
 
 						self.add_stmt(stmt);
 					}
@@ -108,41 +110,53 @@ impl<'tcx> Sema<'tcx> {
 
 		let function_id = ident.to_id();
 
-		let mut params = vec![];
+		let params = {
+			let mut params = vec![];
 
-		for param in &function.params {
-			match &param.pat {
-				Pat::Ident(ident) => {
-					let id = ident.to_id();
+			for param in &function.params {
+				match &param.pat {
+					Pat::Ident(ident) => {
+						let id = ident.to_id();
 
-					let ty = match &ident.type_ann {
-						Some(type_ann) => self.ty_builder.build_tstype(&type_ann.type_ann),
-						None => {
-							panic!("Param type annotation is required");
-						}
-					};
+						let ty = match &ident.type_ann {
+							Some(type_ann) => self.ty_builder.build_tstype(&type_ann.type_ann),
+							None => {
+								panic!("Param type annotation is required");
+							}
+						};
 
-					params.push(air::Var { id, ty: Some(ty) });
+						params.push(air::TypedVar::new(air::Var { id }, ty));
+					}
+					_ => unimplemented!("{:#?}", param),
 				}
-				_ => unimplemented!("{:#?}", param),
 			}
-		}
 
-		let ret_ty = match &function.return_type {
-			Some(type_ann) => self.ty_builder.build_tstype(&type_ann.type_ann),
-			None => {
-				// NOTE: seal does't infer the return type
-				self.tcx.new_ty(crate::TyKind::Void)
-			}
+			params
 		};
-		let ret = air::Var::new_ret(&function_id, ret_ty);
+
+		let ret = {
+			let ty = match &function.return_type {
+				Some(type_ann) => self.ty_builder.build_tstype(&type_ann.type_ann),
+				None => {
+					// NOTE: seal does't infer the return type
+					self.tcx.new_ty(crate::TyKind::Void)
+				}
+			};
+
+			air::TypedVar::new(air::Var::new_ret(&function_id), ty)
+		};
+
+		self.start_function(air::Function {
+			id: function_id.clone(),
+			params,
+			ret,
+			body: vec![self.new_block()],
+		});
 
 		let body = match &function.body {
 			Some(body) => body,
 			None => panic!("Function body is required"),
 		};
-
-		self.start_function(function_id, params, ret);
 
 		for stmt in &body.stmts {
 			self.build_stmt(stmt);
@@ -151,7 +165,7 @@ impl<'tcx> Sema<'tcx> {
 		self.finish_function();
 	}
 
-	fn build_expr(&self, expr: &Expr) -> air::Expr<'tcx> {
+	fn build_expr(&self, expr: &Expr) -> air::Expr {
 		match expr {
 			Expr::Assign(assign) => {
 				let binding = match &assign.left {
@@ -162,11 +176,11 @@ impl<'tcx> Sema<'tcx> {
 					_ => unimplemented!("{:#?}", assign.left),
 				};
 				let id = binding.to_id();
-				let ty = binding
-					.type_ann
-					.as_ref()
-					.map(|type_ann| self.ty_builder.build_tstype(&type_ann.type_ann));
-				let var = air::Var { id, ty };
+				// let ty = binding
+				// 	.type_ann
+				// 	.as_ref()
+				// 	.map(|type_ann| self.ty_builder.build_tstype(&type_ann.type_ann));
+				let var = air::Var { id };
 
 				self.add_stmt(air::Stmt::Assign(air::Assign {
 					var: var.clone(),
@@ -194,7 +208,7 @@ impl<'tcx> Sema<'tcx> {
 			}),
 			Expr::Ident(ident) => {
 				let id = ident.to_id();
-				let var = air::Var { id, ty: None };
+				let var = air::Var { id };
 
 				air::Expr::Var(var)
 			}
