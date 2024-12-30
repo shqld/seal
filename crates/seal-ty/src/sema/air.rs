@@ -1,7 +1,33 @@
 use swc_atoms::Atom;
+use swc_common::SyntaxContext;
 use swc_ecma_ast::Id;
 
 use crate::Ty;
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Symbol(Id);
+
+impl Symbol {
+	pub fn new(id: Id) -> Self {
+		Self(id)
+	}
+
+	fn id(&self) -> &Id {
+		&self.0
+	}
+
+	pub fn new_main() -> Self {
+		Self((Atom::new("@main"), SyntaxContext::empty()))
+	}
+
+	pub fn new_ret(function: &Symbol) -> Self {
+		Self((Atom::new("@ret"), function.id().1))
+	}
+
+	pub fn is_ret(&self) -> bool {
+		self.id().0 == Atom::new("@ret")
+	}
+}
 
 #[derive(Debug, Clone)]
 pub struct Module<'tcx> {
@@ -10,7 +36,7 @@ pub struct Module<'tcx> {
 
 #[derive(Debug, Clone)]
 pub struct Function<'tcx> {
-	pub id: Id,
+	pub name: Symbol,
 	pub params: Vec<TypedVar<'tcx>>,
 	pub ret: TypedVar<'tcx>,
 	pub body: Vec<Block<'tcx>>,
@@ -27,7 +53,7 @@ impl<'tcx> TypedVar<'tcx> {
 	}
 
 	pub fn is_ret(&self) -> bool {
-		self.0.is_ret()
+		self.0.name.is_ret()
 	}
 
 	pub fn var(&self) -> &Var {
@@ -102,22 +128,12 @@ pub enum Stmt<'tcx> {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Var {
-	pub id: Id,
+	pub name: Symbol,
 }
 
 impl Var {
-	pub fn new(id: Id) -> Self {
-		Self { id }
-	}
-
-	pub fn new_ret(function_id: &Id) -> Self {
-		Self {
-			id: (Atom::new("@ret"), function_id.1),
-		}
-	}
-
-	pub fn is_ret(&self) -> bool {
-		self.id.0 == Atom::new("@ret")
+	pub fn new(name: Symbol) -> Self {
+		Self { name }
 	}
 }
 

@@ -78,13 +78,13 @@ impl<'tcx> Sema<'tcx> {
 							Pat::Ident(ident) => ident,
 							_ => unimplemented!("{:#?}", var_declarator.name),
 						};
-						let id = binding.to_id();
+						let name = air::Symbol::new(binding.to_id());
 						// let ty = binding
 						// 	.type_ann
 						// 	.as_ref()
 						// 	.map(|type_ann| self.ty_builder.build_tstype(&type_ann.type_ann));
 
-						self.add_assign_stmt(air::Var { id }, expr);
+						self.add_assign_stmt(air::Var { name }, expr);
 					}
 				}
 			}
@@ -100,7 +100,7 @@ impl<'tcx> Sema<'tcx> {
 			ident, function, ..
 		} = fn_decl;
 
-		let function_id = ident.to_id();
+		let function_name = air::Symbol::new(ident.to_id());
 
 		let params = {
 			let mut params = vec![];
@@ -108,7 +108,7 @@ impl<'tcx> Sema<'tcx> {
 			for param in &function.params {
 				match &param.pat {
 					Pat::Ident(ident) => {
-						let id = ident.to_id();
+						let name = air::Symbol::new(ident.to_id());
 
 						let ty = match &ident.type_ann {
 							Some(type_ann) => self.ty_builder.build_tstype(&type_ann.type_ann),
@@ -117,7 +117,7 @@ impl<'tcx> Sema<'tcx> {
 							}
 						};
 
-						params.push(air::TypedVar::new(air::Var { id }, ty));
+						params.push(air::TypedVar::new(air::Var { name }, ty));
 					}
 					_ => unimplemented!("{:#?}", param),
 				}
@@ -135,11 +135,11 @@ impl<'tcx> Sema<'tcx> {
 				}
 			};
 
-			air::TypedVar::new(air::Var::new_ret(&function_id), ty)
+			air::TypedVar::new(air::Var::new(air::Symbol::new_ret(&function_name)), ty)
 		};
 
 		self.start_function(air::Function {
-			id: function_id.clone(),
+			name: function_name.clone(),
 			params,
 			ret,
 			body: vec![self.new_block()],
@@ -167,12 +167,12 @@ impl<'tcx> Sema<'tcx> {
 					},
 					_ => unimplemented!("{:#?}", assign.left),
 				};
-				let id = binding.to_id();
+				let name = air::Symbol::new(binding.to_id());
 				// let ty = binding
 				// 	.type_ann
 				// 	.as_ref()
 				// 	.map(|type_ann| self.ty_builder.build_tstype(&type_ann.type_ann));
-				let var = air::Var { id };
+				let var = air::Var { name };
 
 				self.add_assign_stmt(var.clone(), self.build_expr(&assign.right));
 
@@ -196,8 +196,8 @@ impl<'tcx> Sema<'tcx> {
 				_ => unimplemented!(),
 			}),
 			Expr::Ident(ident) => {
-				let id = ident.to_id();
-				let var = air::Var { id };
+				let name = air::Symbol::new(ident.to_id());
+				let var = air::Var { name };
 
 				air::Expr::Var(var)
 			}

@@ -1,13 +1,11 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use swc_ecma_ast::Id;
-
-use crate::{Ty, TyKind, infer::InferContext, interner::interner::Interner};
+use crate::{Ty, TyKind, infer::InferContext, interner::interner::Interner, sema::air::Symbol};
 
 #[derive(Debug)]
 pub struct TyContext<'tcx> {
 	pub interner: Interner<'tcx, TyKind<'tcx>>,
-	pub types: RefCell<HashMap<Id, Ty<'tcx>>>,
+	pub types: RefCell<HashMap<Symbol, Ty<'tcx>>>,
 	pub infer: InferContext<'tcx>,
 }
 
@@ -30,11 +28,11 @@ impl<'tcx> TyContext<'tcx> {
 		Ty::new(self.interner.intern(TyKind::Infer(id)))
 	}
 
-	pub fn get_ty(&self, id: &Id) -> Option<Ty<'tcx>> {
-		self.types.borrow().get(id).cloned()
+	pub fn get_ty(&self, name: &Symbol) -> Option<Ty<'tcx>> {
+		self.types.borrow().get(name).cloned()
 	}
 
-	pub fn set_ty(&self, id: Id, ty: Ty<'tcx>) {
-		self.types.borrow_mut().insert(id, ty);
+	pub fn set_ty(&self, name: Symbol, ty: Ty<'tcx>) {
+		self.types.borrow_mut().insert(name, ty);
 	}
 }

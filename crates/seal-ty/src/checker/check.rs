@@ -1,7 +1,7 @@
 use crate::{
 	Ty, TyKind,
 	kind::FunctionTy,
-	sema::air::{Block, Const, Expr, Function, Module, Stmt, Var},
+	sema::air::{Block, Const, Expr, Function, Module, Stmt, Symbol},
 };
 
 use super::TypeChecker;
@@ -20,22 +20,22 @@ impl<'tcx> TypeChecker<'tcx> {
 		for param in &function.params {
 			let ty = param.ty();
 			param_tys.push(ty);
-			self.tcx.set_ty(param.var().id.clone(), ty);
+			self.tcx.set_ty(param.var().name.clone(), ty);
 		}
 
 		let ret_ty = function.ret.ty();
-		self.tcx.set_ty(function.ret.var().id.clone(), ret_ty);
+		self.tcx.set_ty(function.ret.var().name.clone(), ret_ty);
 
 		for block in &function.body {
 			self.check_block(block);
 		}
 
-		let ret_ty = self.tcx.get_ty(&Var::new_ret(&function.id).id).unwrap();
+		let ret_ty = self.tcx.get_ty(&Symbol::new_ret(&function.name)).unwrap();
 		if !ret_ty.is_void() {
 			// TODO: 'has_returned' flag
 			let has_assigned_to_ret = function.body.iter().any(|block| {
 				block.stmts().iter().any(|stmt| match stmt {
-					Stmt::Assign(assign) => assign.var().is_ret(),
+					Stmt::Assign(assign) => assign.var().name.is_ret(),
 					_ => false,
 				})
 			});
@@ -50,7 +50,7 @@ impl<'tcx> TypeChecker<'tcx> {
 			ret: ret_ty,
 		}));
 
-		self.tcx.set_ty(function.id.clone(), ty);
+		self.tcx.set_ty(function.name.clone(), ty);
 	}
 
 	pub fn check_block(&'tcx self, block: &Block<'tcx>) {
@@ -63,10 +63,10 @@ impl<'tcx> TypeChecker<'tcx> {
 		match stmt {
 			Stmt::Assign(assign) => {
 				let actual_ty = self.build_expr(assign.expr());
-				let expected_ty = match self.tcx.get_ty(&assign.var().id) {
+				let expected_ty = match self.tcx.get_ty(&assign.var().name) {
 					Some(ty) => ty,
 					None => {
-						self.tcx.set_ty(assign.var().id.clone(), actual_ty);
+						self.tcx.set_ty(assign.var().name.clone(), actual_ty);
 						return;
 					}
 				};
@@ -97,10 +97,10 @@ impl<'tcx> TypeChecker<'tcx> {
 				Const::String(_) => self.tcx.new_ty(TyKind::String),
 			},
 			Expr::Var(var) => {
-				if let Some(ty) = self.tcx.get_ty(&var.id) {
+				if let Some(ty) = self.tcx.get_ty(&var.name) {
 					ty
 				} else {
-					panic!("Type not found: {:?}", var.id);
+					panic!("Type not found: {:?}", var.name);
 				}
 			}
 		}

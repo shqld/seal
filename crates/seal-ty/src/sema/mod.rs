@@ -3,10 +3,7 @@ pub mod build;
 
 use std::cell::{Cell, RefCell};
 
-use swc_atoms::Atom;
-use swc_common::SyntaxContext;
-
-use air::{Block, BlockId, Function, Module, Stmt, Term, TypedVar, Var};
+use air::{Assign, Block, BlockId, Expr, Function, Module, Stmt, Symbol, Term, TypedVar, Var};
 
 use crate::{Ty, TyKind, context::TyContext, type_builder::TypeBuilder};
 
@@ -21,7 +18,7 @@ pub struct Sema<'tcx> {
 impl<'tcx> Sema<'tcx> {
 	pub fn new(tcx: &'tcx TyContext<'tcx>) -> Sema<'tcx> {
 		let type_builder = TypeBuilder::new(tcx);
-		let main_function_id = (Atom::new("@main"), SyntaxContext::empty());
+		let main_function_name = Symbol::new_main();
 
 		Sema {
 			tcx,
@@ -29,10 +26,10 @@ impl<'tcx> Sema<'tcx> {
 			global_block_counter: Cell::new(1),
 			module: RefCell::new(Module { functions: vec![] }),
 			function_stack: RefCell::new(vec![Function {
-				id: main_function_id.clone(),
+				name: main_function_name.clone(),
 				params: vec![],
-				ret: air::TypedVar::new(
-					air::Var::new_ret(&main_function_id),
+				ret: TypedVar::new(
+					Var::new(Symbol::new_ret(&main_function_name)),
 					tcx.new_ty(TyKind::Void),
 				),
 				body: vec![Block::new(BlockId::new(0))],
@@ -114,15 +111,15 @@ impl<'tcx> Sema<'tcx> {
 		}
 	}
 
-	pub fn add_assign_stmt(&self, var: Var, expr: air::Expr) {
-		self.add_stmt(Stmt::Assign(air::Assign::new(var, expr)));
+	pub fn add_assign_stmt(&self, var: Var, expr: Expr) {
+		self.add_stmt(Stmt::Assign(Assign::new(var, expr)));
 	}
 
-	pub fn add_expr_stmt(&self, expr: air::Expr) {
+	pub fn add_expr_stmt(&self, expr: Expr) {
 		self.add_stmt(Stmt::Expr(expr));
 	}
 
-	pub fn add_satisfies_stmt(&self, expr: air::Expr, ty: Ty<'tcx>) {
+	pub fn add_satisfies_stmt(&self, expr: Expr, ty: Ty<'tcx>) {
 		self.add_stmt(Stmt::Satisfies(expr, ty));
 	}
 }
