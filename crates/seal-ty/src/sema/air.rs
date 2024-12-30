@@ -40,13 +40,50 @@ impl<'tcx> TypedVar<'tcx> {
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BlockId(pub usize);
+pub struct BlockId(usize);
+
+impl BlockId {
+	pub fn new(val: usize) -> Self {
+		Self(val)
+	}
+}
 
 #[derive(Debug, Clone)]
 pub struct Block<'tcx> {
-	pub id: BlockId,
-	pub stmts: Vec<Stmt<'tcx>>,
-	pub term: Option<Term>,
+	id: BlockId,
+	stmts: Vec<Stmt<'tcx>>,
+	// TODO: no Option
+	term: Option<Term>,
+}
+
+impl<'tcx> Block<'tcx> {
+	pub fn new(id: BlockId) -> Self {
+		Self {
+			id,
+			stmts: vec![],
+			term: None,
+		}
+	}
+
+	pub fn id(&self) -> BlockId {
+		self.id
+	}
+
+	pub fn stmts(&self) -> &[Stmt<'tcx>] {
+		&self.stmts
+	}
+
+	pub fn term(&self) -> Option<&Term> {
+		self.term.as_ref()
+	}
+
+	pub fn add_stmt(&mut self, stmt: Stmt<'tcx>) {
+		self.stmts.push(stmt);
+	}
+
+	pub fn set_term(&mut self, term: Term) {
+		self.term = Some(term);
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -69,7 +106,9 @@ pub struct Var {
 }
 
 impl Var {
-	// TODO: new
+	pub fn new(id: Id) -> Self {
+		Self { id }
+	}
 
 	pub fn new_ret(function_id: &Id) -> Self {
 		Self {
@@ -84,8 +123,22 @@ impl Var {
 
 #[derive(Debug, Clone)]
 pub struct Assign {
-	pub var: Var,
-	pub expr: Expr,
+	var: Var,
+	expr: Expr,
+}
+
+impl Assign {
+	pub fn new(var: Var, expr: Expr) -> Self {
+		Self { var, expr }
+	}
+
+	pub fn var(&self) -> &Var {
+		&self.var
+	}
+
+	pub fn expr(&self) -> &Expr {
+		&self.expr
+	}
 }
 
 #[derive(Debug, Clone)]

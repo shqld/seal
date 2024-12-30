@@ -35,11 +35,7 @@ impl<'tcx> Sema<'tcx> {
 					air::Var::new_ret(&main_function_id),
 					tcx.new_ty(TyKind::Void),
 				),
-				body: vec![Block {
-					id: BlockId(0),
-					stmts: vec![],
-					term: None,
-				}],
+				body: vec![Block::new(BlockId::new(0))],
 			}]),
 		}
 	}
@@ -49,16 +45,19 @@ impl<'tcx> Sema<'tcx> {
 
 		self.global_block_counter.set(val);
 
-		Block {
-			id: BlockId(val),
-			stmts: vec![],
-			term: None,
-		}
+		Block::new(BlockId::new(val))
 	}
 
 	pub fn add_block(&self, block: Block<'tcx>) {
 		if let Some(function) = self.function_stack.borrow_mut().last_mut() {
+			if let Some(current_block) = function.body.last_mut() {
+				if current_block.term().is_none() {
+					current_block.set_term(Term::Goto(block.id()));
+				}
+			}
 			function.body.push(block);
+		} else {
+			panic!("No function to add block to");
 		}
 	}
 
@@ -66,11 +65,13 @@ impl<'tcx> Sema<'tcx> {
 		self.add_block(self.new_block());
 	}
 
-	pub fn finish_block(&self, term: Option<Term>) {
+	pub fn finish_block(&self, term: Term) {
 		if let Some(function) = self.function_stack.borrow_mut().last_mut() {
 			if let Some(block) = function.body.last_mut() {
-				if block.term.is_none() {
-					block.term = term;
+				if block.term().is_some() {
+					panic!("Block already terminated");
+				} else {
+					block.set_term(term);
 				}
 			}
 		}
@@ -81,9 +82,16 @@ impl<'tcx> Sema<'tcx> {
 	}
 
 	pub fn finish_function(&self) {
-		self.finish_block(Some(Term::Return));
-
-		if let Some(function) = self.function_stack.borrow_mut().pop() {
+		if let Some(mut function) = self.function_stack.borrow_mut().pop() {
+			if let Some(block) = function.body.last_mut() {
+				if let Some(term) = block.term() {
+					if !matches!(term, Term::Return) {
+						panic!("Function does not return");
+					}
+				} else {
+					block.set_term(Term::Return);
+				}
+			}
 			self.module.borrow_mut().functions.push(function);
 		} else {
 			panic!("No function to finish");
@@ -101,19 +109,13 @@ impl<'tcx> Sema<'tcx> {
 	pub fn add_stmt(&self, stmt: Stmt<'tcx>) {
 		if let Some(function) = self.function_stack.borrow_mut().last_mut() {
 			if let Some(block) = function.body.last_mut() {
-				if block.term.is_some() {
-					let mut block = self.new_block();
-					block.stmts.push(stmt);
-					function.body.push(block);
-				} else {
-					block.stmts.push(stmt);
-				}
+				block.add_stmt(stmt);
 			}
 		}
 	}
 
 	pub fn add_assign_stmt(&self, var: Var, expr: air::Expr) {
-		self.add_stmt(Stmt::Assign(air::Assign { var, expr }));
+		self.add_stmt(Stmt::Assign(air::Assign::new(var, expr)));
 	}
 
 	pub fn add_expr_stmt(&self, expr: air::Expr) {

@@ -1,7 +1,7 @@
 use crate::{
 	Ty, TyKind,
 	kind::FunctionTy,
-	sema::air::{Assign, Block, Const, Expr, Function, Module, Stmt, Var},
+	sema::air::{Block, Const, Expr, Function, Module, Stmt, Var},
 };
 
 use super::TypeChecker;
@@ -34,8 +34,8 @@ impl<'tcx> TypeChecker<'tcx> {
 		if !ret_ty.is_void() {
 			// TODO: 'has_returned' flag
 			let has_assigned_to_ret = function.body.iter().any(|block| {
-				block.stmts.iter().any(|stmt| match stmt {
-					Stmt::Assign(Assign { var, .. }) => var.is_ret(),
+				block.stmts().iter().any(|stmt| match stmt {
+					Stmt::Assign(assign) => assign.var().is_ret(),
 					_ => false,
 				})
 			});
@@ -54,19 +54,19 @@ impl<'tcx> TypeChecker<'tcx> {
 	}
 
 	pub fn check_block(&'tcx self, block: &Block<'tcx>) {
-		for stmt in &block.stmts {
+		for stmt in block.stmts() {
 			self.check_stmt(stmt);
 		}
 	}
 
 	pub fn check_stmt(&'tcx self, stmt: &Stmt<'tcx>) {
 		match stmt {
-			Stmt::Assign(Assign { var, expr }) => {
-				let actual_ty = self.build_expr(expr);
-				let expected_ty = match self.tcx.get_ty(&var.id) {
+			Stmt::Assign(assign) => {
+				let actual_ty = self.build_expr(assign.expr());
+				let expected_ty = match self.tcx.get_ty(&assign.var().id) {
 					Some(ty) => ty,
 					None => {
-						self.tcx.set_ty(var.id.clone(), actual_ty);
+						self.tcx.set_ty(assign.var().id.clone(), actual_ty);
 						return;
 					}
 				};

@@ -56,7 +56,7 @@ impl<'tcx> Sema<'tcx> {
 					self.add_assign_stmt(self.get_current_function_ret().var().clone(), expr);
 				}
 
-				self.finish_block(Some(air::Term::Return));
+				self.finish_block(air::Term::Return);
 			}
 			_ => unimplemented!("{:#?}", stmt),
 		}
