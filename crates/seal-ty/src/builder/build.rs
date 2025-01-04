@@ -1,7 +1,10 @@
 use swc_ecma_ast::{
 	AssignTarget, Decl, Expr, ExprStmt, FnDecl, Lit, ModuleItem, Pat, Program, ReturnStmt,
-	SimpleAssignTarget, Stmt, TsSatisfiesExpr, VarDeclKind,
+	SimpleAssignTarget, Stmt, TsFnOrConstructorType, TsKeywordTypeKind, TsSatisfiesExpr, TsType,
+	VarDeclKind,
 };
+
+use crate::{Ty, TyKind, kind::FunctionTy};
 
 use super::{
 	Sema,
@@ -77,7 +80,7 @@ impl<'tcx> Sema<'tcx> {
 					let ty = binding
 						.type_ann
 						.as_ref()
-						.map(|type_ann| self.ty_builder.build_tstype(&type_ann.type_ann))
+						.map(|type_ann| self.build_tstype(&type_ann.type_ann))
 						.unwrap_or_else(|| self.tcx.new_infer_ty());
 
 					let init = match &var_declarator.init {
@@ -117,7 +120,7 @@ impl<'tcx> Sema<'tcx> {
 						let name = air::Symbol::new(ident.to_id());
 
 						let ty = match &ident.type_ann {
-							Some(type_ann) => self.ty_builder.build_tstype(&type_ann.type_ann),
+							Some(type_ann) => self.build_tstype(&type_ann.type_ann),
 							None => {
 								panic!("Param type annotation is required");
 							}
@@ -135,7 +138,7 @@ impl<'tcx> Sema<'tcx> {
 
 		let ret = {
 			let ty = match &function.return_type {
-				Some(type_ann) => self.ty_builder.build_tstype(&type_ann.type_ann),
+				Some(type_ann) => self.build_tstype(&type_ann.type_ann),
 				None => {
 					// NOTE: seal does't infer the return type
 					self.tcx.new_ty(crate::TyKind::Void)
@@ -185,7 +188,7 @@ impl<'tcx> Sema<'tcx> {
 				self.add_satisfies_stmt(
 					// TODO:
 					expr.clone(),
-					self.ty_builder.build_tstype(type_ann),
+					self.build_tstype(type_ann),
 				);
 
 				expr
@@ -203,5 +206,38 @@ impl<'tcx> Sema<'tcx> {
 			}
 			_ => unimplemented!("{:#?}", expr),
 		}
+	}
+
+	pub fn build_tstype(&self, tstype: &TsType) -> Ty<'tcx> {
+		self.tcx.new_ty(match tstype {
+			TsType::TsKeywordType(keyword) => match keyword.kind {
+				TsKeywordTypeKind::TsNumberKeyword => TyKind::Number,
+				TsKeywordTypeKind::TsStringKeyword => TyKind::String,
+				TsKeywordTypeKind::TsBooleanKeyword => TyKind::Boolean,
+				TsKeywordTypeKind::TsVoidKeyword => TyKind::Void,
+				_ => unimplemented!(),
+			},
+			TsType::TsFnOrConstructorType(fn_or_constructor) => match fn_or_constructor {
+				TsFnOrConstructorType::TsFnType(fn_) => {
+					let ret_ty = self.build_tstype(&fn_.type_ann.type_ann);
+
+					let mut param_tys = vec![];
+					for param in &fn_.params {
+						let ty = self.build_tstype(
+							// TODO:
+							&param.clone().expect_ident().type_ann.unwrap().type_ann,
+						);
+						param_tys.push(ty);
+					}
+
+					TyKind::Function(FunctionTy {
+						params: param_tys,
+						ret: ret_ty,
+					})
+				}
+				_ => unimplemented!(),
+			},
+			_ => unimplemented!("{:#?}", tstype),
+		})
 	}
 }

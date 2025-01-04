@@ -1,4 +1,4 @@
-use seal_ty::{checker::parse::parse, context::TyContext, sema::Sema};
+use seal_ty::{builder::Sema, checker::parse::parse, context::TyContext};
 
 fn run(code: &'static str) {
 	let result = parse(code).unwrap();

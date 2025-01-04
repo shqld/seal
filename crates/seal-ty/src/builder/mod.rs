@@ -8,11 +8,10 @@ use std::{
 
 use air::{Assign, Block, BlockId, Expr, Function, Let, Module, Stmt, Symbol, Term, TypedVar};
 
-use crate::{Ty, TyKind, context::TyContext, type_builder::TypeBuilder};
+use crate::{Ty, TyKind, context::TyContext};
 
 pub struct Sema<'tcx> {
 	tcx: &'tcx TyContext<'tcx>,
-	ty_builder: TypeBuilder<'tcx>,
 	global_block_counter: Cell<usize>,
 	module: RefCell<Module<'tcx>>,
 	function_stack: RefCell<Vec<Function<'tcx>>>,
@@ -25,11 +24,8 @@ pub struct VarInfo {
 
 impl<'tcx> Sema<'tcx> {
 	pub fn new(tcx: &'tcx TyContext<'tcx>) -> Sema<'tcx> {
-		let type_builder = TypeBuilder::new(tcx);
-
 		Sema {
 			tcx,
-			ty_builder: type_builder,
 			global_block_counter: Cell::new(1),
 			module: RefCell::new(Module { functions: vec![] }),
 			function_stack: RefCell::new(vec![Function {

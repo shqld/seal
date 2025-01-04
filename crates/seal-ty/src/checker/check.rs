@@ -1,7 +1,7 @@
 use crate::{
 	Ty, TyKind,
+	builder::air::{Block, Const, Expr, Function, Module, Stmt},
 	kind::FunctionTy,
-	sema::air::{Block, Const, Expr, Function, Module, Stmt},
 };
 
 use super::TypeChecker;

@@ -1,7 +1,7 @@
 use seal_ty::{
+	builder::Sema,
 	checker::{TypeChecker, parse::parse},
 	context::TyContext,
-	sema::Sema,
 };
 
 fn run(code: &'static str) -> Result<(), Vec<String>> {

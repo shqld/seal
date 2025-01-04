@@ -4,20 +4,17 @@ mod satisfies;
 
 use std::cell::RefCell;
 
-use crate::{Ty, TyKind, context::TyContext, type_builder::TypeBuilder};
+use crate::{Ty, TyKind, context::TyContext};
 
 pub struct TypeChecker<'tcx> {
 	tcx: &'tcx TyContext<'tcx>,
-	_ty_builder: TypeBuilder<'tcx>,
 	errors: RefCell<Vec<String>>,
 }
 
 impl<'tcx> TypeChecker<'tcx> {
 	pub fn new(tcx: &'tcx TyContext<'tcx>) -> TypeChecker<'tcx> {
-		let _ty_builder = TypeBuilder::new(tcx);
 		TypeChecker {
 			tcx,
-			_ty_builder,
 			errors: RefCell::new(vec![]),
 		}
 	}
