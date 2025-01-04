@@ -10,10 +10,10 @@ fn run(code: &'static str) -> Result<(), Vec<String>> {
 	let ast = result.program;
 	let tcx = TyContext::new();
 	let sema = Sema::new(&tcx);
-	let air = sema.build(&ast);
+	let sir = sema.build(&ast);
 	let checker = TypeChecker::new(&tcx);
 
-	checker.check(&air)
+	checker.check(&sir)
 }
 
 macro_rules! pass {

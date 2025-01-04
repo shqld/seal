@@ -1,12 +1,12 @@
-pub mod air;
 pub mod build;
+pub mod sir;
 
 use std::{
 	cell::{Cell, RefCell},
 	collections::HashMap,
 };
 
-use air::{Assign, Block, BlockId, Expr, Function, Let, Module, Stmt, Symbol, Term, TypedVar};
+use sir::{Assign, Block, BlockId, Expr, Function, Let, Module, Stmt, Symbol, Term, TypedVar};
 
 use crate::{Ty, TyKind, context::TyContext};
 

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use crate::{Ty, TyKind, builder::air::Symbol, infer::InferContext, interner::interner::Interner};
+use crate::{Ty, TyKind, builder::sir::Symbol, infer::InferContext, interner::interner::Interner};
 
 #[derive(Debug)]
 pub struct TyContext<'tcx> {

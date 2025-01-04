@@ -8,11 +8,11 @@ use crate::{Ty, TyKind, kind::FunctionTy};
 
 use super::{
 	Sema,
-	air::{self},
+	sir::{self},
 };
 
 impl<'tcx> Sema<'tcx> {
-	pub fn build(self, ast: &Program) -> air::Module<'tcx> {
+	pub fn build(self, ast: &Program) -> sir::Module<'tcx> {
 		let stmts = match &ast {
 			Program::Script(script) => &script.body,
 			Program::Module(module) => &module
@@ -42,7 +42,7 @@ impl<'tcx> Sema<'tcx> {
 				let expr = self.build_expr(expr);
 
 				match expr {
-					air::Expr::Var(_) => {}
+					sir::Expr::Var(_) => {}
 					_ => {
 						self.add_expr_stmt(expr);
 					}
@@ -56,7 +56,7 @@ impl<'tcx> Sema<'tcx> {
 				let expr = arg.as_ref().map(|arg| self.build_expr(arg));
 
 				self.add_ret_stmt(expr);
-				self.finish_block(air::Term::Return);
+				self.finish_block(sir::Term::Return);
 			}
 			_ => unimplemented!("{:#?}", stmt),
 		}
@@ -76,7 +76,7 @@ impl<'tcx> Sema<'tcx> {
 						Pat::Ident(ident) => ident,
 						_ => unimplemented!("{:#?}", var_declarator.name),
 					};
-					let name = air::Symbol::new(binding.to_id());
+					let name = sir::Symbol::new(binding.to_id());
 					let ty = binding
 						.type_ann
 						.as_ref()
@@ -109,7 +109,7 @@ impl<'tcx> Sema<'tcx> {
 			ident, function, ..
 		} = fn_decl;
 
-		let function_name = air::Symbol::new(ident.to_id());
+		let function_name = sir::Symbol::new(ident.to_id());
 
 		let params = {
 			let mut params = vec![];
@@ -117,7 +117,7 @@ impl<'tcx> Sema<'tcx> {
 			for param in &function.params {
 				match &param.pat {
 					Pat::Ident(ident) => {
-						let name = air::Symbol::new(ident.to_id());
+						let name = sir::Symbol::new(ident.to_id());
 
 						let ty = match &ident.type_ann {
 							Some(type_ann) => self.build_tstype(&type_ann.type_ann),
@@ -127,7 +127,7 @@ impl<'tcx> Sema<'tcx> {
 						};
 
 						self.add_var_entry(name.clone(), false);
-						params.push(air::TypedVar::new(name, ty));
+						params.push(sir::TypedVar::new(name, ty));
 					}
 					_ => unimplemented!("{:#?}", param),
 				}
@@ -145,7 +145,7 @@ impl<'tcx> Sema<'tcx> {
 				}
 			};
 
-			air::TypedVar::new(air::Symbol::new_ret(), ty)
+			sir::TypedVar::new(sir::Symbol::new_ret(), ty)
 		};
 
 		self.start_function(&function_name, params, ret);
@@ -162,7 +162,7 @@ impl<'tcx> Sema<'tcx> {
 		self.finish_function();
 	}
 
-	fn build_expr(&self, expr: &Expr) -> air::Expr {
+	fn build_expr(&self, expr: &Expr) -> sir::Expr {
 		match expr {
 			Expr::Assign(assign) => {
 				let binding = match &assign.left {
@@ -172,7 +172,7 @@ impl<'tcx> Sema<'tcx> {
 					},
 					_ => unimplemented!("{:#?}", assign.left),
 				};
-				let name = air::Symbol::new(binding.to_id());
+				let name = sir::Symbol::new(binding.to_id());
 
 				if !self.is_var_can_be_assigned(&name) {
 					panic!("Cannot assign to immutable variable");
@@ -180,7 +180,7 @@ impl<'tcx> Sema<'tcx> {
 
 				self.add_assign_stmt(name.clone(), self.build_expr(&assign.right));
 
-				air::Expr::Var(name)
+				sir::Expr::Var(name)
 			}
 			Expr::TsSatisfies(TsSatisfiesExpr { expr, type_ann, .. }) => {
 				let expr = self.build_expr(expr);
@@ -193,16 +193,16 @@ impl<'tcx> Sema<'tcx> {
 
 				expr
 			}
-			Expr::Lit(lit) => air::Expr::Const(match lit {
-				Lit::Bool(val) => air::Const::Boolean(val.value),
-				Lit::Num(val) => air::Const::Number(val.value),
-				Lit::Str(val) => air::Const::String(val.value.clone()),
+			Expr::Lit(lit) => sir::Expr::Const(match lit {
+				Lit::Bool(val) => sir::Const::Boolean(val.value),
+				Lit::Num(val) => sir::Const::Number(val.value),
+				Lit::Str(val) => sir::Const::String(val.value.clone()),
 				_ => unimplemented!(),
 			}),
 			Expr::Ident(ident) => {
-				let name = air::Symbol::new(ident.to_id());
+				let name = sir::Symbol::new(ident.to_id());
 
-				air::Expr::Var(name)
+				sir::Expr::Var(name)
 			}
 			_ => unimplemented!("{:#?}", expr),
 		}

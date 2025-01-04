@@ -1,6 +1,6 @@
 use crate::{
 	Ty, TyKind,
-	builder::air::{Block, Const, Expr, Function, Module, Stmt},
+	builder::sir::{Block, Const, Expr, Function, Module, Stmt},
 	kind::FunctionTy,
 };
 
