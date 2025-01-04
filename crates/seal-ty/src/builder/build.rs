@@ -1,7 +1,7 @@
 use swc_ecma_ast::{
 	AssignTarget, Decl, Expr, ExprStmt, FnDecl, Lit, ModuleItem, Pat, Program, ReturnStmt,
 	SimpleAssignTarget, Stmt, TsFnOrConstructorType, TsKeywordTypeKind, TsSatisfiesExpr, TsType,
-	VarDeclKind,
+	TsUnionOrIntersectionType, VarDeclKind,
 };
 
 use crate::{Ty, TyKind, kind::FunctionTy};
@@ -236,6 +236,15 @@ impl<'tcx> Sema<'tcx> {
 					})
 				}
 				_ => unimplemented!(),
+			},
+			TsType::TsUnionOrIntersectionType(ty) => match ty {
+				TsUnionOrIntersectionType::TsUnionType(ty) => TyKind::Union(
+					ty.types
+						.iter()
+						.map(|ty| self.build_tstype(ty))
+						.collect::<Vec<_>>(),
+				),
+				TsUnionOrIntersectionType::TsIntersectionType(_) => unimplemented!(),
 			},
 			_ => unimplemented!("{:#?}", tstype),
 		})

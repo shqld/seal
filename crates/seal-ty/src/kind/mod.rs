@@ -11,6 +11,7 @@ pub enum TyKind<'tcx> {
 	Function(FunctionTy<'tcx>),
 	Void,
 	Infer(InferId),
+	Union(Vec<Ty<'tcx>>),
 }
 
 impl Display for TyKind<'_> {
@@ -32,6 +33,14 @@ impl Display for TyKind<'_> {
 				ret
 			),
 			TyKind::Void => write!(f, "void"),
+			TyKind::Union(tys) => write!(
+				f,
+				"{}",
+				tys.iter()
+					.map(|ty| ty.to_string())
+					.collect::<Vec<_>>()
+					.join(" | ")
+			),
 		}
 	}
 }

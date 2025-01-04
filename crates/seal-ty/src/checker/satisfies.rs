@@ -34,6 +34,9 @@ impl<'tcx> TypeChecker<'tcx> {
 
 				self.satisfies(expected.ret, actual.ret)
 			}
+			(Union(expected), _) => expected
+				.iter()
+				.any(|expected| self.satisfies(*expected, actual)),
 			_ => expected == actual,
 		}
 	}

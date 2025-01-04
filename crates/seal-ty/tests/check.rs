@@ -199,3 +199,12 @@ fail!(
     "#,
 	&["expected 'number', got 'string'"]
 );
+
+pass!(
+	union_,
+	r#"
+        let x: number | string;
+        x = 42;
+        x = "hello";
+    "#
+);
