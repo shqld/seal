@@ -51,3 +51,20 @@ fail!(
         }
     "#
 );
+
+fail!(
+	assign_to_const_var_,
+	r#"
+        const x = 42;
+        x = 43;
+    "#
+);
+
+fail!(
+	assign_to_params_,
+	r#"
+        function f(x: number) {
+            x = 42;
+        }
+    "#
+);

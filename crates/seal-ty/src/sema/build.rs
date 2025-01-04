@@ -53,7 +53,7 @@ impl<'tcx> Sema<'tcx> {
 				if let Some(arg) = arg {
 					let expr = self.build_expr(arg);
 
-					self.add_assign_stmt(self.get_current_function_ret().var().clone(), expr);
+					self.add_assign_stmt(self.get_current_function_ret().name().clone(), expr);
 				}
 
 				self.finish_block(air::Term::Return);
@@ -65,27 +65,36 @@ impl<'tcx> Sema<'tcx> {
 	fn build_decl(&self, decl: &Decl) {
 		match decl {
 			Decl::Var(var) => {
-				let _is_const = match var.kind {
+				let is_const = match var.kind {
 					VarDeclKind::Var => panic!("Var is not supported"),
 					VarDeclKind::Const => true,
 					VarDeclKind::Let => false,
 				};
 
 				for var_declarator in &var.decls {
-					if let Some(init) = &var_declarator.init {
-						let expr = self.build_expr(init);
-						let binding = match &var_declarator.name {
-							Pat::Ident(ident) => ident,
-							_ => unimplemented!("{:#?}", var_declarator.name),
-						};
-						let name = air::Symbol::new(binding.to_id());
-						// let ty = binding
-						// 	.type_ann
-						// 	.as_ref()
-						// 	.map(|type_ann| self.ty_builder.build_tstype(&type_ann.type_ann));
+					let binding = match &var_declarator.name {
+						Pat::Ident(ident) => ident,
+						_ => unimplemented!("{:#?}", var_declarator.name),
+					};
+					let name = air::Symbol::new(binding.to_id());
+					let ty = binding
+						.type_ann
+						.as_ref()
+						.map(|type_ann| self.ty_builder.build_tstype(&type_ann.type_ann))
+						.unwrap_or_else(|| self.tcx.new_infer_ty());
 
-						self.add_assign_stmt(air::Var { name }, expr);
-					}
+					let init = match &var_declarator.init {
+						Some(init) => Some(self.build_expr(init)),
+						None => {
+							if is_const {
+								panic!("Const variable must be initialized");
+							}
+							None
+						}
+					};
+
+					self.add_var_entry(name.clone(), !is_const);
+					self.add_let_stmt(name, ty, init);
 				}
 			}
 			Decl::Fn(fn_decl) => {
@@ -117,7 +126,8 @@ impl<'tcx> Sema<'tcx> {
 							}
 						};
 
-						params.push(air::TypedVar::new(air::Var { name }, ty));
+						self.add_var_entry(name.clone(), false);
+						params.push(air::TypedVar::new(name, ty));
 					}
 					_ => unimplemented!("{:#?}", param),
 				}
@@ -135,15 +145,10 @@ impl<'tcx> Sema<'tcx> {
 				}
 			};
 
-			air::TypedVar::new(air::Var::new(air::Symbol::new_ret(&function_name)), ty)
+			air::TypedVar::new(air::Symbol::new_ret(&function_name), ty)
 		};
 
-		self.start_function(air::Function {
-			name: function_name.clone(),
-			params,
-			ret,
-			body: vec![self.new_block()],
-		});
+		self.start_function(&function_name, params, ret);
 
 		let body = match &function.body {
 			Some(body) => body,
@@ -168,15 +173,14 @@ impl<'tcx> Sema<'tcx> {
 					_ => unimplemented!("{:#?}", assign.left),
 				};
 				let name = air::Symbol::new(binding.to_id());
-				// let ty = binding
-				// 	.type_ann
-				// 	.as_ref()
-				// 	.map(|type_ann| self.ty_builder.build_tstype(&type_ann.type_ann));
-				let var = air::Var { name };
 
-				self.add_assign_stmt(var.clone(), self.build_expr(&assign.right));
+				if !self.is_var_can_be_assigned(&name) {
+					panic!("Cannot assign to immutable variable");
+				}
 
-				air::Expr::Var(var)
+				self.add_assign_stmt(name.clone(), self.build_expr(&assign.right));
+
+				air::Expr::Var(name)
 			}
 			Expr::TsSatisfies(TsSatisfiesExpr { expr, type_ann, .. }) => {
 				let expr = self.build_expr(expr);
@@ -197,9 +201,8 @@ impl<'tcx> Sema<'tcx> {
 			}),
 			Expr::Ident(ident) => {
 				let name = air::Symbol::new(ident.to_id());
-				let var = air::Var { name };
 
-				air::Expr::Var(var)
+				air::Expr::Var(name)
 			}
 			_ => unimplemented!("{:#?}", expr),
 		}

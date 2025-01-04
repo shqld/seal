@@ -16,18 +16,17 @@ impl<'tcx> TypeChecker<'tcx> {
 
 	pub fn check_function(&'tcx self, function: &Function<'tcx>) {
 		let mut param_tys = vec![];
-
 		for param in &function.params {
 			let ty = param.ty();
 			param_tys.push(ty);
-			self.tcx.set_ty(param.var().name.clone(), ty);
+			self.tcx.set_ty(param.name().clone(), ty);
 		}
 
 		let ret_ty = function.ret.ty();
-		self.tcx.set_ty(function.ret.var().name.clone(), ret_ty);
+		self.tcx.set_ty(function.ret.name().clone(), ret_ty);
 
 		for block in &function.body {
-			self.check_block(block);
+			self.check_block(function, block);
 		}
 
 		let ret_ty = self.tcx.get_ty(&Symbol::new_ret(&function.name)).unwrap();
@@ -35,7 +34,7 @@ impl<'tcx> TypeChecker<'tcx> {
 			// TODO: 'has_returned' flag
 			let has_assigned_to_ret = function.body.iter().any(|block| {
 				block.stmts().iter().any(|stmt| match stmt {
-					Stmt::Assign(assign) => assign.var().name.is_ret(),
+					Stmt::Assign(assign) => assign.left().is_ret(),
 					_ => false,
 				})
 			});
@@ -53,23 +52,47 @@ impl<'tcx> TypeChecker<'tcx> {
 		self.tcx.set_ty(function.name.clone(), ty);
 	}
 
-	pub fn check_block(&'tcx self, block: &Block<'tcx>) {
+	pub fn check_block(&'tcx self, _function: &Function<'tcx>, block: &Block<'tcx>) {
 		for stmt in block.stmts() {
 			self.check_stmt(stmt);
 		}
+
+		// TODO: unify vars in block
 	}
 
 	pub fn check_stmt(&'tcx self, stmt: &Stmt<'tcx>) {
 		match stmt {
-			Stmt::Assign(assign) => {
-				let actual_ty = self.build_expr(assign.expr());
-				let expected_ty = match self.tcx.get_ty(&assign.var().name) {
-					Some(ty) => ty,
-					None => {
-						self.tcx.set_ty(assign.var().name.clone(), actual_ty);
+			Stmt::Let(let_) => {
+				let var = let_.var();
+				let name = var.name().clone();
+				let ty = var.ty();
+
+				if let Some(init) = let_.init() {
+					let expected_ty = ty;
+					let actual_ty = self.build_expr(init);
+
+					// if no type is specified to the declaration, replace with actual type
+					if let TyKind::Infer(_) = ty.kind() {
+						self.tcx.set_ty(name, actual_ty);
 						return;
 					}
-				};
+
+					if !self.satisfies(expected_ty, actual_ty) {
+						self.raise_type_error(expected_ty, actual_ty);
+					}
+				}
+
+				self.tcx.set_ty(name, ty);
+			}
+			Stmt::Assign(assign) => {
+				let expected_ty = self.tcx.get_ty(assign.left()).unwrap();
+				let actual_ty = self.build_expr(assign.right());
+
+				// if no type is specified to the declaration, replace with actual type
+				if let TyKind::Infer(_) = expected_ty.kind() {
+					self.tcx.set_ty(assign.left().clone(), actual_ty);
+					return;
+				}
 
 				if !self.satisfies(expected_ty, actual_ty) {
 					self.raise_type_error(expected_ty, actual_ty);
@@ -96,11 +119,11 @@ impl<'tcx> TypeChecker<'tcx> {
 				Const::Number(_) => self.tcx.new_ty(TyKind::Number),
 				Const::String(_) => self.tcx.new_ty(TyKind::String),
 			},
-			Expr::Var(var) => {
-				if let Some(ty) = self.tcx.get_ty(&var.name) {
+			Expr::Var(name) => {
+				if let Some(ty) = self.tcx.get_ty(name) {
 					ty
 				} else {
-					panic!("Type not found: {:?}", var.name);
+					panic!("Type not found: {:?}", name);
 				}
 			}
 		}

@@ -53,7 +53,7 @@ pass!(
 );
 
 fail!(
-	assign_,
+	assign_type_mismatched_value_to_initialized_var,
 	r#"
         let a = 1;
         a = "hello";
@@ -173,5 +173,23 @@ fail!(
         function f() {
             return 42;
         }
+    "#
+);
+
+pass!(
+	assign_to_annotated_var_,
+	r#"
+        let n: number;
+        n = 1;
+
+        n satisfies number;
+    "#
+);
+
+fail!(
+	assign_to_annotated_var_type_mismatch_,
+	r#"
+        let n: number;
+        n = "hello";
     "#
 );

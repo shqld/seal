@@ -1,9 +1,12 @@
 pub mod air;
 pub mod build;
 
-use std::cell::{Cell, RefCell};
+use std::{
+	cell::{Cell, RefCell},
+	collections::HashMap,
+};
 
-use air::{Assign, Block, BlockId, Expr, Function, Module, Stmt, Symbol, Term, TypedVar, Var};
+use air::{Assign, Block, BlockId, Expr, Function, Let, Module, Stmt, Symbol, Term, TypedVar};
 
 use crate::{Ty, TyKind, context::TyContext, type_builder::TypeBuilder};
 
@@ -13,6 +16,11 @@ pub struct Sema<'tcx> {
 	global_block_counter: Cell<usize>,
 	module: RefCell<Module<'tcx>>,
 	function_stack: RefCell<Vec<Function<'tcx>>>,
+	var_table: RefCell<HashMap<Symbol, VarInfo>>,
+}
+
+pub struct VarInfo {
+	can_be_assigned: bool,
 }
 
 impl<'tcx> Sema<'tcx> {
@@ -29,11 +37,12 @@ impl<'tcx> Sema<'tcx> {
 				name: main_function_name.clone(),
 				params: vec![],
 				ret: TypedVar::new(
-					Var::new(Symbol::new_ret(&main_function_name)),
+					Symbol::new_ret(&main_function_name),
 					tcx.new_ty(TyKind::Void),
 				),
 				body: vec![Block::new(BlockId::new(0))],
 			}]),
+			var_table: RefCell::new(HashMap::new()),
 		}
 	}
 
@@ -74,8 +83,15 @@ impl<'tcx> Sema<'tcx> {
 		}
 	}
 
-	pub fn start_function(&self, function: Function<'tcx>) {
-		self.function_stack.borrow_mut().push(function);
+	pub fn start_function(&self, name: &Symbol, params: Vec<TypedVar<'tcx>>, ret: TypedVar<'tcx>) {
+		self.global_block_counter.set(0);
+
+		self.function_stack.borrow_mut().push(Function {
+			name: name.clone(),
+			params,
+			ret,
+			body: vec![self.new_block()],
+		});
 	}
 
 	pub fn finish_function(&self) {
@@ -111,8 +127,12 @@ impl<'tcx> Sema<'tcx> {
 		}
 	}
 
-	pub fn add_assign_stmt(&self, var: Var, expr: Expr) {
-		self.add_stmt(Stmt::Assign(Assign::new(var, expr)));
+	pub fn add_let_stmt(&self, name: Symbol, ty: Ty<'tcx>, init: Option<Expr>) {
+		self.add_stmt(Stmt::Let(Let::new(TypedVar::new(name, ty), init)));
+	}
+
+	pub fn add_assign_stmt(&self, name: Symbol, expr: Expr) {
+		self.add_stmt(Stmt::Assign(Assign::new(name, expr)));
 	}
 
 	pub fn add_expr_stmt(&self, expr: Expr) {
@@ -121,5 +141,15 @@ impl<'tcx> Sema<'tcx> {
 
 	pub fn add_satisfies_stmt(&self, expr: Expr, ty: Ty<'tcx>) {
 		self.add_stmt(Stmt::Satisfies(expr, ty));
+	}
+
+	pub fn add_var_entry(&self, symbol: Symbol, can_be_assigned: bool) {
+		self.var_table
+			.borrow_mut()
+			.insert(symbol, VarInfo { can_be_assigned });
+	}
+
+	pub fn is_var_can_be_assigned(&self, symbol: &Symbol) -> bool {
+		self.var_table.borrow().get(symbol).unwrap().can_be_assigned
 	}
 }

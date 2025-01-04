@@ -40,28 +40,29 @@ pub struct Function<'tcx> {
 	pub params: Vec<TypedVar<'tcx>>,
 	pub ret: TypedVar<'tcx>,
 	pub body: Vec<Block<'tcx>>,
-	// TODO: decls
-	// pub decls: Vec<TypedVar<'tcx>>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TypedVar<'tcx>(Var, Ty<'tcx>);
+pub struct TypedVar<'tcx> {
+	name: Symbol,
+	ty: Ty<'tcx>,
+}
 
 impl<'tcx> TypedVar<'tcx> {
-	pub fn new(var: Var, ty: Ty<'tcx>) -> Self {
-		Self(var, ty)
+	pub fn new(name: Symbol, ty: Ty<'tcx>) -> Self {
+		Self { name, ty }
 	}
 
 	pub fn is_ret(&self) -> bool {
-		self.0.name.is_ret()
+		self.name.is_ret()
 	}
 
-	pub fn var(&self) -> &Var {
-		&self.0
+	pub fn name(&self) -> &Symbol {
+		&self.name
 	}
 
 	pub fn ty(&self) -> Ty<'tcx> {
-		self.1
+		self.ty
 	}
 }
 
@@ -121,45 +122,55 @@ pub enum Term {
 
 #[derive(Debug, Clone)]
 pub enum Stmt<'tcx> {
+	Let(Let<'tcx>),
 	Assign(Assign),
 	Expr(Expr),
 	Satisfies(Expr, Ty<'tcx>),
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Var {
-	pub name: Symbol,
+#[derive(Debug, Clone)]
+pub struct Let<'tcx> {
+	var: TypedVar<'tcx>,
+	init: Option<Expr>,
 }
 
-impl Var {
-	pub fn new(name: Symbol) -> Self {
-		Self { name }
+impl<'tcx> Let<'tcx> {
+	pub fn new(var: TypedVar<'tcx>, init: Option<Expr>) -> Self {
+		Self { var, init }
+	}
+
+	pub fn var(&self) -> &TypedVar<'tcx> {
+		&self.var
+	}
+
+	pub fn init(&self) -> Option<&Expr> {
+		self.init.as_ref()
 	}
 }
 
 #[derive(Debug, Clone)]
 pub struct Assign {
-	var: Var,
-	expr: Expr,
+	left: Symbol,
+	right: Expr,
 }
 
 impl Assign {
-	pub fn new(var: Var, expr: Expr) -> Self {
-		Self { var, expr }
+	pub fn new(left: Symbol, right: Expr) -> Self {
+		Self { left, right }
 	}
 
-	pub fn var(&self) -> &Var {
-		&self.var
+	pub fn left(&self) -> &Symbol {
+		&self.left
 	}
 
-	pub fn expr(&self) -> &Expr {
-		&self.expr
+	pub fn right(&self) -> &Expr {
+		&self.right
 	}
 }
 
 #[derive(Debug, Clone)]
 pub enum Expr {
-	Var(Var),
+	Var(Symbol),
 	Const(Const),
 }
 

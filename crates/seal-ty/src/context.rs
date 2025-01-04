@@ -28,11 +28,11 @@ impl<'tcx> TyContext<'tcx> {
 		Ty::new(self.interner.intern(TyKind::Infer(id)))
 	}
 
-	pub fn get_ty(&self, name: &Symbol) -> Option<Ty<'tcx>> {
-		self.types.borrow().get(name).cloned()
+	pub fn get_ty(&self, id: &Symbol) -> Option<Ty<'tcx>> {
+		self.types.borrow().get(id).cloned()
 	}
 
-	pub fn set_ty(&self, name: Symbol, ty: Ty<'tcx>) {
-		self.types.borrow_mut().insert(name, ty);
+	pub fn set_ty(&self, id: Symbol, ty: Ty<'tcx>) {
+		self.types.borrow_mut().insert(id, ty);
 	}
 }

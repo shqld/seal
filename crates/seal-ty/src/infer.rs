@@ -72,7 +72,7 @@ impl<'tcx> InferContext<'tcx> {
 		if let Entry::Vacant(e) = map.entry(id) {
 			e.insert(ty);
 		} else {
-			panic!("Infer type already resolved: {:?}", id);
+			panic!("Infer type already unified: {:?}", id);
 		}
 
 		ty

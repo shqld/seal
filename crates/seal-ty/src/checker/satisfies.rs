@@ -7,11 +7,13 @@ impl<'tcx> TypeChecker<'tcx> {
 		use crate::TyKind::*;
 
 		match (expected.kind(), actual.kind()) {
-			// e.g. function return type
+			// e.g. `let n; n = 1;`
 			(Infer(id), _) => match self.tcx.infer.resolve_ty(*id) {
 				Some(expected) => self.satisfies(expected, actual),
 				None => {
-					panic!("Expecting unresolved infer type");
+					self.tcx.infer.add_constraint(*id, expected);
+
+					true
 				}
 			},
 			// e.g. function param types
