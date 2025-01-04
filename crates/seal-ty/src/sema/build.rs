@@ -50,12 +50,9 @@ impl<'tcx> Sema<'tcx> {
 					panic!("Cannot return on main");
 				}
 
-				if let Some(arg) = arg {
-					let expr = self.build_expr(arg);
+				let expr = arg.as_ref().map(|arg| self.build_expr(arg));
 
-					self.add_assign_stmt(self.get_current_function_ret().name().clone(), expr);
-				}
-
+				self.add_ret_stmt(expr);
 				self.finish_block(air::Term::Return);
 			}
 			_ => unimplemented!("{:#?}", stmt),
@@ -145,7 +142,7 @@ impl<'tcx> Sema<'tcx> {
 				}
 			};
 
-			air::TypedVar::new(air::Symbol::new_ret(&function_name), ty)
+			air::TypedVar::new(air::Symbol::new_ret(), ty)
 		};
 
 		self.start_function(&function_name, params, ret);

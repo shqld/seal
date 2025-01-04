@@ -4,7 +4,7 @@ use seal_ty::{
 	sema::Sema,
 };
 
-fn run(code: &'static str) {
+fn run(code: &'static str) -> Result<(), Vec<String>> {
 	let result = parse(code).unwrap();
 
 	let ast = result.program;
@@ -13,24 +13,32 @@ fn run(code: &'static str) {
 	let air = sema.build(&ast);
 	let checker = TypeChecker::new(&tcx);
 
-	checker.check(&air);
+	checker.check(&air)
 }
 
 macro_rules! pass {
 	($case_name:ident, $code:literal) => {
 		#[test]
 		fn $case_name() {
-			run($code);
+			run($code).unwrap();
 		}
 	};
 }
 
 macro_rules! fail {
-	($case_name:ident, $code:literal) => {
-		#[should_panic]
+	($case_name:ident, $code:literal, $expected:expr) => {
 		#[test]
 		fn $case_name() {
-			run($code);
+			let errors = run($code).unwrap_err();
+			let expected: &[&'static str] = $expected;
+
+			assert_eq!(
+				errors,
+				expected
+					.iter()
+					.map(|s| s.to_string())
+					.collect::<Vec<String>>()
+			);
 		}
 	};
 }
@@ -57,7 +65,8 @@ fail!(
 	r#"
         let a = 1;
         a = "hello";
-    "#
+    "#,
+	&["expected 'number', got 'string'"]
 );
 
 fail!(
@@ -66,7 +75,8 @@ fail!(
         let a;
         a = 1;
         a = "hello";
-    "#
+    "#,
+	&["expected 'number', got 'string'"]
 );
 
 pass!(
@@ -126,7 +136,8 @@ fail!(
 	r#"
         function f(n: number): number {
         }
-    "#
+    "#,
+	&["function does not return"]
 );
 
 fail!(
@@ -135,15 +146,8 @@ fail!(
         function f(n: number): number {
             return;
         }
-    "#
-);
-
-fail!(
-	function_ret_mismatch_3_,
-	r#"
-        function f(n: number): number {
-        }
-    "#
+    "#,
+	&["expected return value"]
 );
 
 pass!(
@@ -173,7 +177,8 @@ fail!(
         function f() {
             return 42;
         }
-    "#
+    "#,
+	&["expected 'void', got 'number'"]
 );
 
 pass!(
@@ -191,5 +196,6 @@ fail!(
 	r#"
         let n: number;
         n = "hello";
-    "#
+    "#,
+	&["expected 'number', got 'string'"]
 );

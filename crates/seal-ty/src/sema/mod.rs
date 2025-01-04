@@ -26,7 +26,6 @@ pub struct VarInfo {
 impl<'tcx> Sema<'tcx> {
 	pub fn new(tcx: &'tcx TyContext<'tcx>) -> Sema<'tcx> {
 		let type_builder = TypeBuilder::new(tcx);
-		let main_function_name = Symbol::new_main();
 
 		Sema {
 			tcx,
@@ -34,12 +33,9 @@ impl<'tcx> Sema<'tcx> {
 			global_block_counter: Cell::new(1),
 			module: RefCell::new(Module { functions: vec![] }),
 			function_stack: RefCell::new(vec![Function {
-				name: main_function_name.clone(),
+				name: Symbol::new_main(),
 				params: vec![],
-				ret: TypedVar::new(
-					Symbol::new_ret(&main_function_name),
-					tcx.new_ty(TyKind::Void),
-				),
+				ret: TypedVar::new(Symbol::new_ret(), tcx.new_ty(TyKind::Void)),
 				body: vec![Block::new(BlockId::new(0))],
 			}]),
 			var_table: RefCell::new(HashMap::new()),
@@ -133,6 +129,10 @@ impl<'tcx> Sema<'tcx> {
 
 	pub fn add_assign_stmt(&self, name: Symbol, expr: Expr) {
 		self.add_stmt(Stmt::Assign(Assign::new(name, expr)));
+	}
+
+	pub fn add_ret_stmt(&self, expr: Option<Expr>) {
+		self.add_stmt(Stmt::Ret(expr));
 	}
 
 	pub fn add_expr_stmt(&self, expr: Expr) {

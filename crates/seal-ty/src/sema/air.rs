@@ -20,12 +20,14 @@ impl Symbol {
 		Self((Atom::new("@main"), SyntaxContext::empty()))
 	}
 
-	pub fn new_ret(function: &Symbol) -> Self {
-		Self((Atom::new("@ret"), function.id().1))
+	pub fn new_ret() -> Self {
+		Self((Atom::new("@ret"), SyntaxContext::empty()))
 	}
+}
 
-	pub fn is_ret(&self) -> bool {
-		self.id().0 == Atom::new("@ret")
+impl std::fmt::Display for Symbol {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.id().0)
 	}
 }
 
@@ -51,10 +53,6 @@ pub struct TypedVar<'tcx> {
 impl<'tcx> TypedVar<'tcx> {
 	pub fn new(name: Symbol, ty: Ty<'tcx>) -> Self {
 		Self { name, ty }
-	}
-
-	pub fn is_ret(&self) -> bool {
-		self.name.is_ret()
 	}
 
 	pub fn name(&self) -> &Symbol {
@@ -124,6 +122,7 @@ pub enum Term {
 pub enum Stmt<'tcx> {
 	Let(Let<'tcx>),
 	Assign(Assign),
+	Ret(Option<Expr>),
 	Expr(Expr),
 	Satisfies(Expr, Ty<'tcx>),
 }
