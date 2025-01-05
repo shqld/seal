@@ -1,10 +1,12 @@
+use std::collections::BTreeSet;
+
 use swc_ecma_ast::{
-	AssignTarget, Decl, Expr, ExprStmt, FnDecl, Lit, ModuleItem, Pat, Program, ReturnStmt,
-	SimpleAssignTarget, Stmt, TsFnOrConstructorType, TsKeywordTypeKind, TsSatisfiesExpr, TsType,
-	TsUnionOrIntersectionType, VarDeclKind,
+	AssignTarget, BinaryOp, Decl, Expr, ExprStmt, FnDecl, IfStmt, Lit, ModuleItem, Pat, Program,
+	ReturnStmt, SimpleAssignTarget, Stmt, TsFnOrConstructorType, TsKeywordTypeKind, TsLit,
+	TsLitType, TsSatisfiesExpr, TsType, TsUnionOrIntersectionType, UnaryOp, VarDeclKind,
 };
 
-use crate::{Ty, TyKind, kind::FunctionTy};
+use crate::Ty;
 
 use super::{
 	Sema,
@@ -57,6 +59,39 @@ impl<'tcx> Sema<'tcx> {
 
 				self.add_ret_stmt(expr);
 				self.finish_block(sir::Term::Return);
+			}
+			Stmt::If(IfStmt {
+				test, cons, alt, ..
+			}) => {
+				let test = self.build_expr(test);
+				let cons_block = self.new_block();
+				let continue_block = self.new_block();
+				let alt = alt.as_ref().map(|alt| (alt, self.new_block()));
+
+				if let Some((_, alt_block)) = &alt {
+					self.finish_block(sir::Term::Switch(test, cons_block.id(), alt_block.id()));
+				} else {
+					self.finish_block(sir::Term::Switch(
+						test,
+						cons_block.id(),
+						continue_block.id(),
+					));
+				}
+
+				self.add_block(cons_block);
+				self.build_stmt(cons);
+
+				if let Some((alt, alt_block)) = alt {
+					self.add_block(alt_block);
+					self.build_stmt(alt);
+				}
+
+				self.add_block(continue_block);
+			}
+			Stmt::Block(block) => {
+				for stmt in &block.stmts {
+					self.build_stmt(stmt);
+				}
 			}
 			_ => unimplemented!("{:#?}", stmt),
 		}
@@ -204,17 +239,34 @@ impl<'tcx> Sema<'tcx> {
 
 				sir::Expr::Var(name)
 			}
+			Expr::Unary(unary) => {
+				let expr = self.build_expr(&unary.arg);
+
+				match unary.op {
+					UnaryOp::TypeOf => sir::Expr::TypeOf(Box::new(expr)),
+					_ => unimplemented!("{:#?}", unary),
+				}
+			}
+			Expr::Bin(bin) => {
+				let left = self.build_expr(&bin.left);
+				let right = self.build_expr(&bin.right);
+
+				match bin.op {
+					BinaryOp::EqEqEq => sir::Expr::Eq(Box::new(left), Box::new(right)),
+					_ => unimplemented!("{:#?}", bin),
+				}
+			}
 			_ => unimplemented!("{:#?}", expr),
 		}
 	}
 
 	pub fn build_tstype(&self, tstype: &TsType) -> Ty<'tcx> {
-		self.tcx.new_ty(match tstype {
+		match tstype {
 			TsType::TsKeywordType(keyword) => match keyword.kind {
-				TsKeywordTypeKind::TsNumberKeyword => TyKind::Number,
-				TsKeywordTypeKind::TsStringKeyword => TyKind::String,
-				TsKeywordTypeKind::TsBooleanKeyword => TyKind::Boolean,
-				TsKeywordTypeKind::TsVoidKeyword => TyKind::Void,
+				TsKeywordTypeKind::TsNumberKeyword => self.tcx.new_number(),
+				TsKeywordTypeKind::TsStringKeyword => self.tcx.new_string(),
+				TsKeywordTypeKind::TsBooleanKeyword => self.tcx.new_boolean(),
+				TsKeywordTypeKind::TsVoidKeyword => self.tcx.new_void(),
 				_ => unimplemented!(),
 			},
 			TsType::TsFnOrConstructorType(fn_or_constructor) => match fn_or_constructor {
@@ -230,23 +282,24 @@ impl<'tcx> Sema<'tcx> {
 						param_tys.push(ty);
 					}
 
-					TyKind::Function(FunctionTy {
-						params: param_tys,
-						ret: ret_ty,
-					})
+					self.tcx.new_function(param_tys, ret_ty)
 				}
 				_ => unimplemented!(),
 			},
 			TsType::TsUnionOrIntersectionType(ty) => match ty {
-				TsUnionOrIntersectionType::TsUnionType(ty) => TyKind::Union(
+				TsUnionOrIntersectionType::TsUnionType(ty) => self.tcx.new_union(
 					ty.types
 						.iter()
 						.map(|ty| self.build_tstype(ty))
-						.collect::<Vec<_>>(),
+						.collect::<BTreeSet<_>>(),
 				),
 				TsUnionOrIntersectionType::TsIntersectionType(_) => unimplemented!(),
 			},
+			TsType::TsLitType(TsLitType { lit, .. }) => match lit {
+				TsLit::Str(str) => self.tcx.new_const_string(str.value.clone()),
+				_ => unimplemented!(),
+			},
 			_ => unimplemented!("{:#?}", tstype),
-		})
+		}
 	}
 }

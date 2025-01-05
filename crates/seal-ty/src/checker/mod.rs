@@ -4,11 +4,12 @@ mod satisfies;
 
 use std::cell::RefCell;
 
-use crate::{Ty, TyKind, context::TyContext};
+use crate::{Ty, TyKind, constants::TyConstants, context::TyContext};
 
 pub struct TypeChecker<'tcx> {
 	tcx: &'tcx TyContext<'tcx>,
 	errors: RefCell<Vec<String>>,
+	constants: TyConstants<'tcx>,
 }
 
 impl<'tcx> TypeChecker<'tcx> {
@@ -16,6 +17,7 @@ impl<'tcx> TypeChecker<'tcx> {
 		TypeChecker {
 			tcx,
 			errors: RefCell::new(vec![]),
+			constants: TyConstants::new(tcx),
 		}
 	}
 

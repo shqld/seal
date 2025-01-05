@@ -26,17 +26,30 @@ impl<'tcx> TypeChecker<'tcx> {
 				}
 			},
 			(Function(expected), Function(actual)) => {
+				if expected.params.len() != actual.params.len() {
+					return false;
+				}
+
+				if !self.satisfies(expected.ret, actual.ret) {
+					return false;
+				}
+
 				for (expected, actual) in expected.params.iter().zip(&actual.params) {
 					if !self.satisfies(*expected, *actual) {
 						return false;
 					}
 				}
 
-				self.satisfies(expected.ret, actual.ret)
+				true
 			}
-			(Union(expected), _) => expected
-				.iter()
-				.any(|expected| self.satisfies(*expected, actual)),
+			(Union(expected), Union(actual)) => actual.tys().iter().all(|actual| {
+				expected
+					.tys()
+					.iter()
+					.any(|expected| self.satisfies(*expected, *actual))
+			}),
+			(Union(expected), _) => expected.tys().iter().any(|ty| self.satisfies(*ty, actual)),
+			(String(None), String(_)) => true,
 			_ => expected == actual,
 		}
 	}

@@ -208,3 +208,18 @@ pass!(
         x = "hello";
     "#
 );
+
+pass!(
+	narrow_union_by_if_stmt_,
+	r#"
+        let x: boolean | number | string = 42;
+
+        if (typeof x === 'number') {
+            x satisfies number;
+        } else if (typeof x === 'string') {
+            x satisfies string;
+        } else {
+            x satisfies boolean;
+        }
+    "#
+);

@@ -171,6 +171,8 @@ impl Assign {
 pub enum Expr {
 	Var(Symbol),
 	Const(Const),
+	TypeOf(Box<Expr>),
+	Eq(Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug, Clone)]

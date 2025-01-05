@@ -1,4 +1,6 @@
-use std::{fmt::Display, hash::Hash};
+use std::{collections::BTreeSet, fmt::Display, hash::Hash};
+
+use swc_atoms::Atom;
 
 use crate::{Ty, infer::InferId};
 
@@ -6,12 +8,13 @@ use crate::{Ty, infer::InferId};
 pub enum TyKind<'tcx> {
 	Boolean,
 	Number,
-	String,
+	String(Option<Atom>),
 	Err,
-	Function(FunctionTy<'tcx>),
+	Function(Function<'tcx>),
 	Void,
 	Infer(InferId),
-	Union(Vec<Ty<'tcx>>),
+	Union(Union<'tcx>),
+	Never,
 }
 
 impl Display for TyKind<'_> {
@@ -19,10 +22,13 @@ impl Display for TyKind<'_> {
 		match self {
 			TyKind::Boolean => write!(f, "boolean"),
 			TyKind::Number => write!(f, "number"),
-			TyKind::String => write!(f, "string"),
+			TyKind::String(value) => match value {
+				Some(value) => write!(f, "\"{}\"", value),
+				None => write!(f, "string"),
+			},
 			TyKind::Err => write!(f, "<err>"),
 			TyKind::Infer(id) => write!(f, "<infer: {id}>",),
-			TyKind::Function(FunctionTy { params, ret }) => write!(
+			TyKind::Function(Function { params, ret }) => write!(
 				f,
 				"({}) => {}",
 				params
@@ -33,7 +39,7 @@ impl Display for TyKind<'_> {
 				ret
 			),
 			TyKind::Void => write!(f, "void"),
-			TyKind::Union(tys) => write!(
+			TyKind::Union(Union { tys }) => write!(
 				f,
 				"{}",
 				tys.iter()
@@ -41,6 +47,7 @@ impl Display for TyKind<'_> {
 					.collect::<Vec<_>>()
 					.join(" | ")
 			),
+			TyKind::Never => write!(f, "never"),
 		}
 	}
 }
@@ -56,7 +63,42 @@ impl TyKind<'_> {
 }
 
 #[derive(Debug, Hash, PartialEq, Eq)]
-pub struct FunctionTy<'tcx> {
+pub struct Function<'tcx> {
 	pub params: Vec<Ty<'tcx>>,
 	pub ret: Ty<'tcx>,
+}
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct Union<'tcx> {
+	tys: BTreeSet<Ty<'tcx>>,
+}
+
+impl<'tcx> Union<'tcx> {
+	pub fn new(tys: BTreeSet<Ty<'tcx>>) -> Self {
+		assert!(tys.len() >= 2);
+
+		let mut inner = BTreeSet::new();
+
+		for ty in tys {
+			match ty.kind() {
+				TyKind::Union(union) => {
+					for ty in union.tys() {
+						inner.insert(*ty);
+					}
+				}
+				TyKind::Infer(_) => {
+					panic!("Union type cannot contain infer types");
+				}
+				_ => {
+					inner.insert(ty);
+				}
+			}
+		}
+
+		Self { tys: inner }
+	}
+
+	pub fn tys(&self) -> &BTreeSet<Ty<'tcx>> {
+		&self.tys
+	}
 }
