@@ -151,8 +151,8 @@ impl<'tcx> TypeChecker<'tcx> {
 	pub fn build_expr(&self, block: &Block<'tcx>, expr: &Expr) -> Ty<'tcx> {
 		match expr {
 			Expr::Const(value) => match value {
-				Const::Boolean(_) => self.tcx.new_ty(TyKind::Boolean),
-				Const::Number(_) => self.tcx.new_ty(TyKind::Number),
+				Const::Boolean(_) => self.constants.boolean,
+				Const::Number(_) => self.constants.number,
 				Const::String(value) => self.tcx.new_const_string(value.clone()),
 			},
 			Expr::Var(name) => {
@@ -171,14 +171,14 @@ impl<'tcx> TypeChecker<'tcx> {
 					// TS(2367)
 					self.add_error(format!("This comparison appears to be unintentional because the types '{left_ty}' and '{right_ty}' have no overlap"));
 
-					return self.tcx.new_ty(TyKind::Err);
+					return self.constants.err;
 				}
 
 				if let Some(narrowed_ty) = self.narrow(block, left, right) {
 					return narrowed_ty;
 				}
 
-				self.tcx.new_ty(TyKind::Boolean)
+				self.constants.boolean
 			}
 			Expr::Member(obj, prop) => {
 				let obj_ty = self.build_expr(block, obj);
@@ -191,7 +191,7 @@ impl<'tcx> TypeChecker<'tcx> {
 							self.add_error(format!(
 								"Property '{prop}' does not exist on type '{obj_ty}'",
 							));
-							self.tcx.new_ty(TyKind::Err)
+							self.constants.err
 						}
 					},
 					TyKind::Union(uni) => {
@@ -210,7 +210,7 @@ impl<'tcx> TypeChecker<'tcx> {
 								"Property '{prop}' does not exist on type '{arm}'",
 							));
 
-							return self.tcx.new_ty(TyKind::Err);
+							return self.constants.err;
 						}
 
 						self.tcx.new_union(prop_arms)
@@ -220,7 +220,7 @@ impl<'tcx> TypeChecker<'tcx> {
 						self.add_error(format!(
 							"Property '{prop}' does not exist on type '{obj_ty}'",
 						));
-						self.tcx.new_ty(TyKind::Err)
+						self.constants.err
 					}
 				}
 			}

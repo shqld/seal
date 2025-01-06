@@ -8,7 +8,10 @@ use std::{
 
 use sir::{Assign, Block, BlockId, Expr, Function, Let, Module, Stmt, Symbol, Term, TypedVar};
 
-use crate::{Ty, TyKind, context::TyContext};
+use crate::{
+	Ty,
+	context::{TyConstants, TyContext},
+};
 
 pub struct Sema<'tcx> {
 	tcx: &'tcx TyContext<'tcx>,
@@ -16,6 +19,7 @@ pub struct Sema<'tcx> {
 	module: RefCell<Module<'tcx>>,
 	function_stack: RefCell<Vec<Function<'tcx>>>,
 	var_table: RefCell<HashMap<Symbol, VarInfo>>,
+	ty_constants: TyConstants<'tcx>,
 }
 
 pub struct VarInfo {
@@ -24,6 +28,8 @@ pub struct VarInfo {
 
 impl<'tcx> Sema<'tcx> {
 	pub fn new(tcx: &'tcx TyContext<'tcx>) -> Sema<'tcx> {
+		let ty_constants = TyConstants::new(tcx);
+
 		Sema {
 			tcx,
 			global_block_counter: Cell::new(1),
@@ -31,10 +37,11 @@ impl<'tcx> Sema<'tcx> {
 			function_stack: RefCell::new(vec![Function {
 				name: Symbol::new_main(),
 				params: vec![],
-				ret: TypedVar::new(Symbol::new_ret(), tcx.new_ty(TyKind::Void)),
+				ret: TypedVar::new(Symbol::new_ret(), ty_constants.void),
 				body: vec![Block::new(BlockId::new(0))],
 			}]),
 			var_table: RefCell::new(HashMap::new()),
+			ty_constants,
 		}
 	}
 

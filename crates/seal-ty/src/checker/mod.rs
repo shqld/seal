@@ -5,7 +5,7 @@ mod satisfies;
 
 use std::cell::RefCell;
 
-use crate::{constants::TyConstants, context::TyContext};
+use crate::context::{TyConstants, TyContext};
 
 pub struct TypeChecker<'tcx> {
 	tcx: &'tcx TyContext<'tcx>,

@@ -15,7 +15,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct TyContext<'tcx> {
-	pub interner: Interner<'tcx, TyKind<'tcx>>,
+	interner: Interner<'tcx, TyKind<'tcx>>,
 	pub infer: InferContext<'tcx>,
 	types: RefCell<HashMap<Symbol, Ty<'tcx>>>,
 	type_overrides: RefCell<HashMap<(Symbol, BlockId), Ty<'tcx>>>,
@@ -30,10 +30,6 @@ impl<'tcx> TyContext<'tcx> {
 			types: RefCell::new(HashMap::new()),
 			type_overrides: RefCell::new(HashMap::new()),
 		}
-	}
-
-	pub fn new_ty(&'tcx self, kind: TyKind<'tcx>) -> Ty<'tcx> {
-		Ty::new(self.interner.intern(kind))
 	}
 
 	pub fn get_ty(&self, id: &Symbol, block_id: BlockId) -> Option<Ty<'tcx>> {
@@ -56,28 +52,12 @@ impl<'tcx> TyContext<'tcx> {
 }
 
 impl<'tcx> TyContext<'tcx> {
-	pub fn new_boolean(&'tcx self) -> Ty<'tcx> {
-		self.new_ty(TyKind::Boolean)
-	}
-
-	pub fn new_number(&'tcx self) -> Ty<'tcx> {
-		self.new_ty(TyKind::Number)
-	}
-
-	pub fn new_string(&'tcx self) -> Ty<'tcx> {
-		self.new_ty(TyKind::String(None))
+	fn new_ty(&'tcx self, kind: TyKind<'tcx>) -> Ty<'tcx> {
+		Ty::new(self.interner.intern(kind))
 	}
 
 	pub fn new_const_string(&'tcx self, value: Atom) -> Ty<'tcx> {
 		self.new_ty(TyKind::String(Some(value)))
-	}
-
-	pub fn new_void(&'tcx self) -> Ty<'tcx> {
-		self.new_ty(TyKind::Void)
-	}
-
-	pub fn new_never(&'tcx self) -> Ty<'tcx> {
-		self.new_ty(TyKind::Never)
 	}
 
 	pub fn new_infer_ty(&'tcx self) -> Ty<'tcx> {
@@ -106,5 +86,41 @@ impl<'tcx> TyContext<'tcx> {
 
 	pub fn new_object(&'tcx self, fields: BTreeMap<Atom, Ty<'tcx>>) -> Ty<'tcx> {
 		self.new_ty(TyKind::Object(Object::new(fields)))
+	}
+
+	pub fn new_guard(&'tcx self, name: Symbol, ty: Ty<'tcx>) -> Ty<'tcx> {
+		self.new_ty(TyKind::Guard(name, ty))
+	}
+}
+
+#[derive(Debug)]
+pub struct TyConstants<'tcx> {
+	pub boolean: Ty<'tcx>,
+	pub number: Ty<'tcx>,
+	pub string: Ty<'tcx>,
+	pub err: Ty<'tcx>,
+	pub void: Ty<'tcx>,
+	pub never: Ty<'tcx>,
+
+	pub type_of: Ty<'tcx>,
+}
+
+impl<'tcx> TyConstants<'tcx> {
+	pub fn new(factory: &'tcx TyContext<'tcx>) -> Self {
+		Self {
+			boolean: factory.new_ty(TyKind::Boolean),
+			number: factory.new_ty(TyKind::Number),
+			string: factory.new_ty(TyKind::String(None)),
+			err: factory.new_ty(TyKind::Err),
+			void: factory.new_ty(TyKind::Void),
+			never: factory.new_ty(TyKind::Never),
+
+			type_of: factory.new_union(
+				["boolean", "number", "string"]
+					.iter()
+					.map(|s| factory.new_const_string(Atom::new(*s)))
+					.collect(),
+			),
+		}
 	}
 }

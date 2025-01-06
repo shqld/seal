@@ -17,14 +17,14 @@ impl<'tcx> TypeChecker<'tcx> {
 					// TODO: seal should allow only const string for rhs of Eq(TypeOf) in Sir?
 					if let TyKind::String(Some(value)) = value_ty.kind() {
 						let narrowed_ty = match value.as_str() {
-							"boolean" => Some(self.tcx.new_boolean()),
-							"number" => Some(self.tcx.new_number()),
-							"string" => Some(self.tcx.new_string()),
+							"boolean" => Some(self.constants.boolean),
+							"number" => Some(self.constants.number),
+							"string" => Some(self.constants.string),
 							_ => None,
 						};
 
 						if let Some(narrowed_ty) = narrowed_ty {
-							return Some(self.tcx.new_ty(TyKind::Guard(name.clone(), narrowed_ty)));
+							return Some(self.tcx.new_guard(name.clone(), narrowed_ty));
 						}
 					}
 				}
@@ -53,7 +53,7 @@ impl<'tcx> TypeChecker<'tcx> {
 
 						let narrowed_ty = self.tcx.new_union(narrowed_arms);
 
-						return Some(self.tcx.new_ty(TyKind::Guard(name.clone(), narrowed_ty)));
+						return Some(self.tcx.new_guard(name.clone(), narrowed_ty));
 					}
 				}
 			}

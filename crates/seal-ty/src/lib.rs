@@ -1,6 +1,5 @@
 pub mod builder;
 pub mod checker;
-pub mod constants;
 pub mod context;
 mod infer;
 mod interner;

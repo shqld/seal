@@ -177,7 +177,7 @@ impl<'tcx> Sema<'tcx> {
 				Some(type_ann) => self.build_tstype(&type_ann.type_ann),
 				None => {
 					// NOTE: seal does't infer the return type
-					self.tcx.new_ty(crate::TyKind::Void)
+					self.ty_constants.void
 				}
 			};
 
@@ -291,11 +291,11 @@ impl<'tcx> Sema<'tcx> {
 	pub fn build_tstype(&self, tstype: &TsType) -> Ty<'tcx> {
 		match tstype {
 			TsType::TsKeywordType(keyword) => match keyword.kind {
-				TsKeywordTypeKind::TsNumberKeyword => self.tcx.new_number(),
-				TsKeywordTypeKind::TsStringKeyword => self.tcx.new_string(),
-				TsKeywordTypeKind::TsBooleanKeyword => self.tcx.new_boolean(),
-				TsKeywordTypeKind::TsVoidKeyword => self.tcx.new_void(),
-				TsKeywordTypeKind::TsNeverKeyword => self.tcx.new_never(),
+				TsKeywordTypeKind::TsNumberKeyword => self.ty_constants.number,
+				TsKeywordTypeKind::TsStringKeyword => self.ty_constants.string,
+				TsKeywordTypeKind::TsBooleanKeyword => self.ty_constants.boolean,
+				TsKeywordTypeKind::TsVoidKeyword => self.ty_constants.void,
+				TsKeywordTypeKind::TsNeverKeyword => self.ty_constants.never,
 				_ => unimplemented!(),
 			},
 			TsType::TsFnOrConstructorType(fn_or_constructor) => match fn_or_constructor {
