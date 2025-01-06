@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use swc_atoms::Atom;
 use swc_common::SyntaxContext;
 use swc_ecma_ast::Id;
@@ -167,12 +169,15 @@ impl Assign {
 	}
 }
 
+// TODO: use swc_ecma_ast::Expr ?
 #[derive(Debug, Clone)]
 pub enum Expr {
 	Var(Symbol),
 	Const(Const),
 	TypeOf(Box<Expr>),
 	Eq(Box<Expr>, Box<Expr>),
+	Member(Box<Expr>, Atom),
+	Object(BTreeMap<Atom, Expr>),
 }
 
 #[derive(Debug, Clone)]

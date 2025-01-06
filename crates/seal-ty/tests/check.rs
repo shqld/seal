@@ -210,7 +210,7 @@ pass!(
 );
 
 pass!(
-	narrow_union_by_if_stmt_,
+	narrow_primitive_union_by_if_stmt_,
 	r#"
         let x: boolean | number | string = 42;
 
@@ -222,4 +222,144 @@ pass!(
             x satisfies boolean;
         }
     "#
+);
+
+// TODO: this test unexpectedly passes because the type of 'x' is not narrowed to 'string' after the if statement
+// fail!(
+// 	narrowed_union_,
+// 	r#"
+//         let x: number | string = 42;
+
+//         if (typeof x === 'number') {
+//             x satisfies number;
+//         }
+
+//         x satisfies string;
+//     "#,
+// 	&[]
+// );
+
+pass!(
+	assign_to_narrowed_union_,
+	r#"
+        let x: number | string = 42;
+
+        if (typeof x === 'number') {
+            x = 42;
+            // TODO:
+            // x = "hello";
+        } else {
+            // TODO:
+            // x = 42;
+            x = "hello";
+        }
+    "#
+);
+
+pass!(
+	object_,
+	r#"
+        let x: { n: number } = { n: 42 };
+        x satisfies { n: number };
+        x.n satisfies number;
+    "#
+);
+
+fail!(
+	assign_to_object_mismatch_1_,
+	r#"
+        let x: { n: number } = 42;
+    "#,
+	&["expected '{n: number}', got 'number'"]
+);
+
+fail!(
+	assign_to_object_mismatch_2_,
+	r#"
+        let x: { n: number } = { n: 'hello' };
+    "#,
+	&["expected '{n: number}', got '{n: \"hello\"}'"]
+);
+
+pass!(
+	narrow_object_union_by_if_stmt_,
+	r#"
+        let x: { t: "a", u: "x" } | { t: "b", u: "y" } | { t: "c", u: "z" } = { t: "a", u: "x" };
+
+        if (x.t === 'a') {
+            x satisfies { t: "a", u: "x" };
+        } else if (x.t === 'b') {
+            x satisfies { t: "b", u: "y" };
+        } else {
+            x satisfies { t: "c", u: "z" };
+        }
+    "#
+);
+
+pass!(
+	get_prop_on_object_,
+	r#"
+        let x = { n: 42 };
+
+        x.n satisfies number;
+    "#
+);
+
+pass!(
+	get_prop_on_union_,
+	r#"
+        let x: { x: number } | { x: string } = { x: 42 };
+
+        // TODO: this assertion doesn't cover the case where 'x.x' is a 'number' or 'string'
+        x.x satisfies number | string;
+    "#
+);
+
+pass!(
+	// TODO:
+	assign_prop_on_union_,
+	r#"
+        let x: { x: number } | { x: string } = { x: 42 };
+
+        // x.x = 42;
+        // x.x = "hello";
+    "#
+);
+
+fail!(
+	get_prop_on_non_object_,
+	r#"
+        let x: number = 42;
+        x.t;
+    "#,
+	&["Property 't' does not exist on type 'number'",]
+);
+
+fail!(
+	get_non_existent_prop_on_object_,
+	r#"
+        let x: { n: number } = { n: 42 };
+        x.t;
+    "#,
+	&["Property 't' does not exist on type '{n: number}'"]
+);
+
+fail!(
+	get_prop_on_union_with_non_object_arm_,
+	r#"
+        let x: number | { n: number } = 42;
+        x.n;
+    "#,
+	&["Property 'n' does not exist on type 'number'"]
+);
+
+fail!(
+	eq_operands_have_no_overlap_,
+	r#"
+        let x: { n: number } = { n: 42 };
+        x.n === "hello";
+    "#,
+	&[
+		"This comparison appears to be unintentional because the types 'number' and '\"hello\"' have no overlap"
+	]
 );

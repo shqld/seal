@@ -1,8 +1,12 @@
-use std::{collections::BTreeSet, fmt::Display, hash::Hash};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	fmt::Display,
+	hash::Hash,
+};
 
 use swc_atoms::Atom;
 
-use crate::{Ty, infer::InferId};
+use crate::{Ty, builder::sir::Symbol, infer::InferId};
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub enum TyKind<'tcx> {
@@ -15,12 +19,14 @@ pub enum TyKind<'tcx> {
 	Infer(InferId),
 	Union(Union<'tcx>),
 	Never,
+	Object(Object<'tcx>),
+	Guard(Symbol, Ty<'tcx>),
 }
 
 impl Display for TyKind<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			TyKind::Boolean => write!(f, "boolean"),
+			TyKind::Boolean | TyKind::Guard(_, _) => write!(f, "boolean"),
 			TyKind::Number => write!(f, "number"),
 			TyKind::String(value) => match value {
 				Some(value) => write!(f, "\"{}\"", value),
@@ -39,7 +45,7 @@ impl Display for TyKind<'_> {
 				ret
 			),
 			TyKind::Void => write!(f, "void"),
-			TyKind::Union(Union { tys }) => write!(
+			TyKind::Union(Union { arms: tys }) => write!(
 				f,
 				"{}",
 				tys.iter()
@@ -48,6 +54,15 @@ impl Display for TyKind<'_> {
 					.join(" | ")
 			),
 			TyKind::Never => write!(f, "never"),
+			TyKind::Object(Object { fields }) => write!(
+				f,
+				"{{{}}}",
+				fields
+					.iter()
+					.map(|(name, ty)| format!("{}: {}", name, ty))
+					.collect::<Vec<_>>()
+					.join(", ")
+			),
 		}
 	}
 }
@@ -70,7 +85,7 @@ pub struct Function<'tcx> {
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Union<'tcx> {
-	tys: BTreeSet<Ty<'tcx>>,
+	arms: BTreeSet<Ty<'tcx>>,
 }
 
 impl<'tcx> Union<'tcx> {
@@ -82,7 +97,7 @@ impl<'tcx> Union<'tcx> {
 		for ty in tys {
 			match ty.kind() {
 				TyKind::Union(union) => {
-					for ty in union.tys() {
+					for ty in union.arms() {
 						inner.insert(*ty);
 					}
 				}
@@ -95,10 +110,29 @@ impl<'tcx> Union<'tcx> {
 			}
 		}
 
-		Self { tys: inner }
+		Self { arms: inner }
 	}
 
-	pub fn tys(&self) -> &BTreeSet<Ty<'tcx>> {
-		&self.tys
+	pub fn arms(&self) -> &BTreeSet<Ty<'tcx>> {
+		&self.arms
+	}
+}
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct Object<'tcx> {
+	fields: BTreeMap<Atom, Ty<'tcx>>,
+}
+
+impl<'tcx> Object<'tcx> {
+	pub fn new(fields: BTreeMap<Atom, Ty<'tcx>>) -> Self {
+		Self { fields }
+	}
+
+	pub fn fields(&self) -> &BTreeMap<Atom, Ty<'tcx>> {
+		&self.fields
+	}
+
+	pub fn get_prop(&self, prop: &Atom) -> Option<Ty<'tcx>> {
+		self.fields.get(prop).copied()
 	}
 }

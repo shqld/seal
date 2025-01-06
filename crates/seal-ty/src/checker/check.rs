@@ -1,3 +1,5 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::{
 	Ty, TyKind,
 	builder::sir::{Block, Const, Expr, Function, Module, Stmt, Term},
@@ -51,46 +53,31 @@ impl<'tcx> TypeChecker<'tcx> {
 	}
 
 	pub fn check_block(&self, function: &Function<'tcx>, block: &Block<'tcx>) {
-		dbg!(&block);
-
 		for stmt in block.stmts() {
 			self.check_stmt(function, block, stmt);
 		}
 
-		if let Term::Switch(Expr::Eq(left, right), cons_block_id, alt_block_id) =
-			block.term().unwrap()
-		{
-			match (left.as_ref(), right.as_ref()) {
-				(Expr::TypeOf(arg), cmp) | (cmp, Expr::TypeOf(arg)) => {
-					if let Expr::Var(name) = arg.as_ref() {
-						let cmp_ty = self.build_expr(block, cmp);
+		if let Term::Switch(test, cons_block_id, alt_block_id) = block.term().unwrap() {
+			let test_ty = self.build_expr(block, test);
 
-						// TODO: seal should allow only const string for rhs of Eq(TypeOf) in Sir?
-						if let TyKind::String(Some(value)) = cmp_ty.kind() {
-							let narrowed_ty = match value.as_str() {
-								"boolean" => Some(self.tcx.new_boolean()),
-								"number" => Some(self.tcx.new_number()),
-								"string" => Some(self.tcx.new_string()),
-								_ => None,
-							};
+			if let TyKind::Guard(name, narrowed_ty) = test_ty.kind() {
+				self.tcx.override_ty(name, *cons_block_id, *narrowed_ty);
 
-							if let Some(narrowed_ty) = narrowed_ty {
-								self.tcx.override_ty(name, *cons_block_id, narrowed_ty);
+				let current_ty = self.tcx.get_ty(name, block.id()).unwrap();
 
-								let var_ty = self.tcx.get_ty(name, block.id()).unwrap();
+				if let TyKind::Union(current) = current_ty.kind() {
+					let narrowed_arms = match narrowed_ty.kind() {
+						TyKind::Union(narrowed) => narrowed.arms(),
+						_ => &BTreeSet::from([*narrowed_ty]),
+					};
 
-								if let TyKind::Union(uni) = var_ty.kind() {
-									self.tcx.override_ty(
-										name,
-										*alt_block_id,
-										self.tcx.new_excluded_union(uni, narrowed_ty),
-									);
-								}
-							}
-						}
-					}
+					let rest_arms = current.arms().difference(narrowed_arms).copied().collect();
+
+					// TODO: alt_block does not always conflict with cons_block
+					//       (in the case of an if statement without an else, alt_block will be continue)
+					self.tcx
+						.override_ty(name, *alt_block_id, self.tcx.new_union(rest_arms));
 				}
-				_ => {}
 			}
 		}
 
@@ -176,7 +163,76 @@ impl<'tcx> TypeChecker<'tcx> {
 				}
 			}
 			Expr::TypeOf(_) => self.constants.type_of,
-			Expr::Eq(_, _) => self.tcx.new_ty(TyKind::Boolean),
+			Expr::Eq(left, right) => {
+				let left_ty = self.build_expr(block, left);
+				let right_ty = self.build_expr(block, right);
+
+				if !self.overlaps(left_ty, right_ty) {
+					// TS(2367)
+					self.add_error(format!("This comparison appears to be unintentional because the types '{left_ty}' and '{right_ty}' have no overlap"));
+
+					return self.tcx.new_ty(TyKind::Err);
+				}
+
+				if let Some(narrowed_ty) = self.narrow(block, left, right) {
+					return narrowed_ty;
+				}
+
+				self.tcx.new_ty(TyKind::Boolean)
+			}
+			Expr::Member(obj, prop) => {
+				let obj_ty = self.build_expr(block, obj);
+
+				match obj_ty.kind() {
+					TyKind::Object(obj) => match obj.fields().get(prop) {
+						Some(ty) => *ty,
+						None => {
+							// TS(2339)
+							self.add_error(format!(
+								"Property '{prop}' does not exist on type '{obj_ty}'",
+							));
+							self.tcx.new_ty(TyKind::Err)
+						}
+					},
+					TyKind::Union(uni) => {
+						let mut prop_arms = BTreeSet::new();
+
+						for arm in uni.arms() {
+							if let TyKind::Object(obj) = arm.kind() {
+								if let Some(prop) = obj.get_prop(prop) {
+									prop_arms.insert(prop);
+									continue;
+								}
+							}
+
+							// TS(2339)
+							self.add_error(format!(
+								"Property '{prop}' does not exist on type '{arm}'",
+							));
+
+							return self.tcx.new_ty(TyKind::Err);
+						}
+
+						self.tcx.new_union(prop_arms)
+					}
+					_ => {
+						// TS(2339)
+						self.add_error(format!(
+							"Property '{prop}' does not exist on type '{obj_ty}'",
+						));
+						self.tcx.new_ty(TyKind::Err)
+					}
+				}
+			}
+			Expr::Object(fields) => {
+				let mut field_tys = BTreeMap::new();
+				for (key, value) in fields {
+					let ty = self.build_expr(block, value);
+					field_tys.insert(key.clone(), ty);
+				}
+
+				self.tcx.new_object(field_tys)
+			}
 		}
 	}
 

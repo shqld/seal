@@ -1,9 +1,10 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use swc_ecma_ast::{
-	AssignTarget, BinaryOp, Decl, Expr, ExprStmt, FnDecl, IfStmt, Lit, ModuleItem, Pat, Program,
-	ReturnStmt, SimpleAssignTarget, Stmt, TsFnOrConstructorType, TsKeywordTypeKind, TsLit,
-	TsLitType, TsSatisfiesExpr, TsType, TsUnionOrIntersectionType, UnaryOp, VarDeclKind,
+	AssignTarget, BinaryOp, Decl, Expr, ExprStmt, FnDecl, IfStmt, Lit, MemberProp, ModuleItem, Pat,
+	Program, Prop, PropOrSpread, ReturnStmt, SimpleAssignTarget, Stmt, TsFnOrConstructorType,
+	TsKeywordTypeKind, TsLit, TsLitType, TsSatisfiesExpr, TsType, TsTypeLit,
+	TsUnionOrIntersectionType, UnaryOp, VarDeclKind,
 };
 
 use crate::Ty;
@@ -256,6 +257,33 @@ impl<'tcx> Sema<'tcx> {
 					_ => unimplemented!("{:#?}", bin),
 				}
 			}
+			Expr::Member(member) => {
+				let obj = self.build_expr(&member.obj);
+				let prop = match &member.prop {
+					MemberProp::Ident(ident) => ident.sym.clone(),
+					_ => unimplemented!("{:#?}", member.prop),
+				};
+
+				sir::Expr::Member(Box::new(obj), prop)
+			}
+			Expr::Object(obj) => {
+				let mut fields = BTreeMap::new();
+				for prop in &obj.props {
+					match prop {
+						PropOrSpread::Prop(prop) => match prop.as_ref() {
+							Prop::KeyValue(kv) => {
+								let key = kv.key.as_ident().unwrap().sym.clone();
+								let value = self.build_expr(&kv.value);
+								fields.insert(key, value);
+							}
+							_ => unimplemented!("{:#?}", prop),
+						},
+						_ => unimplemented!("{:#?}", prop),
+					}
+				}
+
+				sir::Expr::Object(fields)
+			}
 			_ => unimplemented!("{:#?}", expr),
 		}
 	}
@@ -267,6 +295,7 @@ impl<'tcx> Sema<'tcx> {
 				TsKeywordTypeKind::TsStringKeyword => self.tcx.new_string(),
 				TsKeywordTypeKind::TsBooleanKeyword => self.tcx.new_boolean(),
 				TsKeywordTypeKind::TsVoidKeyword => self.tcx.new_void(),
+				TsKeywordTypeKind::TsNeverKeyword => self.tcx.new_never(),
 				_ => unimplemented!(),
 			},
 			TsType::TsFnOrConstructorType(fn_or_constructor) => match fn_or_constructor {
@@ -297,8 +326,23 @@ impl<'tcx> Sema<'tcx> {
 			},
 			TsType::TsLitType(TsLitType { lit, .. }) => match lit {
 				TsLit::Str(str) => self.tcx.new_const_string(str.value.clone()),
-				_ => unimplemented!(),
+				_ => unimplemented!("{:#?}", lit),
 			},
+			TsType::TsTypeLit(TsTypeLit { members, .. }) => {
+				let mut fields = BTreeMap::new();
+				for member in members {
+					match member {
+						swc_ecma_ast::TsTypeElement::TsPropertySignature(prop) => {
+							let name = prop.key.as_ident().unwrap().sym.clone();
+							let ty = self.build_tstype(&prop.type_ann.as_ref().unwrap().type_ann);
+							fields.insert(name, ty);
+						}
+						_ => unimplemented!("{:#?}", member),
+					}
+				}
+
+				self.tcx.new_object(fields)
+			}
 			_ => unimplemented!("{:#?}", tstype),
 		}
 	}

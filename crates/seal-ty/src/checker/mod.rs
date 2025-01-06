@@ -1,10 +1,11 @@
 pub mod check;
+mod narrow;
 pub mod parse;
 mod satisfies;
 
 use std::cell::RefCell;
 
-use crate::{Ty, TyKind, constants::TyConstants, context::TyContext};
+use crate::{constants::TyConstants, context::TyContext};
 
 pub struct TypeChecker<'tcx> {
 	tcx: &'tcx TyContext<'tcx>,
@@ -19,10 +20,6 @@ impl<'tcx> TypeChecker<'tcx> {
 			errors: RefCell::new(vec![]),
 			constants: TyConstants::new(tcx),
 		}
-	}
-
-	pub fn new_ty(&'tcx self, kind: TyKind<'tcx>) -> Ty<'tcx> {
-		self.tcx.new_ty(kind)
 	}
 
 	pub fn add_error(&self, error: String) {

@@ -7,6 +7,8 @@ impl<'tcx> TypeChecker<'tcx> {
 		use crate::TyKind::*;
 
 		match (expected.kind(), actual.kind()) {
+			// prevent cascading errors
+			(Err, _) => true,
 			// e.g. `let n; n = 1;`
 			(Infer(id), _) => match self.tcx.infer.resolve_ty(*id) {
 				Some(expected) => self.satisfies(expected, actual),
@@ -42,15 +44,20 @@ impl<'tcx> TypeChecker<'tcx> {
 
 				true
 			}
-			(Union(expected), Union(actual)) => actual.tys().iter().all(|actual| {
+			(Union(expected), Union(actual)) => actual.arms().iter().all(|actual| {
 				expected
-					.tys()
+					.arms()
 					.iter()
 					.any(|expected| self.satisfies(*expected, *actual))
 			}),
-			(Union(expected), _) => expected.tys().iter().any(|ty| self.satisfies(*ty, actual)),
+			(Union(expected), _) => expected.arms().iter().any(|ty| self.satisfies(*ty, actual)),
 			(String(None), String(_)) => true,
+			(Boolean, Guard(_, _)) | (Guard(_, _), Boolean) => true,
 			_ => expected == actual,
 		}
+	}
+
+	pub fn overlaps(&self, left: Ty<'tcx>, right: Ty<'tcx>) -> bool {
+		self.satisfies(left, right) || self.satisfies(right, left)
 	}
 }

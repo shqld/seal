@@ -1,6 +1,6 @@
 use std::{
 	cell::RefCell,
-	collections::{BTreeSet, HashMap},
+	collections::{BTreeMap, BTreeSet, HashMap},
 };
 
 use swc_atoms::Atom;
@@ -10,7 +10,7 @@ use crate::{
 	builder::sir::{BlockId, Symbol},
 	infer::InferContext,
 	interner::interner::Interner,
-	kind::{Function, Union},
+	kind::{Function, Object, Union},
 };
 
 #[derive(Debug)]
@@ -76,6 +76,10 @@ impl<'tcx> TyContext<'tcx> {
 		self.new_ty(TyKind::Void)
 	}
 
+	pub fn new_never(&'tcx self) -> Ty<'tcx> {
+		self.new_ty(TyKind::Never)
+	}
+
 	pub fn new_infer_ty(&'tcx self) -> Ty<'tcx> {
 		let id = self.infer.new_id();
 		Ty::new(self.interner.intern(TyKind::Infer(id)))
@@ -85,18 +89,22 @@ impl<'tcx> TyContext<'tcx> {
 		self.new_ty(TyKind::Function(Function { params, ret }))
 	}
 
-	pub fn new_union(&'tcx self, tys: BTreeSet<Ty<'tcx>>) -> Ty<'tcx> {
-		match tys.len() {
+	pub fn new_union(&'tcx self, arms: BTreeSet<Ty<'tcx>>) -> Ty<'tcx> {
+		match arms.len() {
 			0 => self.new_ty(TyKind::Never),
-			1 => *tys.first().unwrap(),
-			_ => self.new_ty(TyKind::Union(Union::new(tys))),
+			1 => *arms.first().unwrap(),
+			_ => self.new_ty(TyKind::Union(Union::new(arms))),
 		}
 	}
 
-	pub fn new_excluded_union(&'tcx self, uni: &Union<'tcx>, ty: Ty<'tcx>) -> Ty<'tcx> {
-		let mut tys = uni.tys().clone();
-		tys.remove(&ty);
+	pub fn new_excluded_union(&'tcx self, uni: &Union<'tcx>, arm: Ty<'tcx>) -> Ty<'tcx> {
+		let mut tys = uni.arms().clone();
+		tys.remove(&arm);
 
 		self.new_union(tys)
+	}
+
+	pub fn new_object(&'tcx self, fields: BTreeMap<Atom, Ty<'tcx>>) -> Ty<'tcx> {
+		self.new_ty(TyKind::Object(Object::new(fields)))
 	}
 }
