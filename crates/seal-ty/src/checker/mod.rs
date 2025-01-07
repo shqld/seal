@@ -26,7 +26,7 @@ pub struct Function<'tcx> {
 	has_returned: bool,
 }
 
-pub struct TypeChecker<'tcx> {
+pub struct Checker<'tcx> {
 	tcx: &'tcx TyContext<'tcx>,
 	constants: TyConstants<'tcx>,
 	errors: RefCell<Vec<String>>,
@@ -34,11 +34,11 @@ pub struct TypeChecker<'tcx> {
 	block_id_counter: Cell<usize>,
 }
 
-impl<'tcx> TypeChecker<'tcx> {
-	pub fn new(tcx: &'tcx TyContext<'tcx>) -> TypeChecker<'tcx> {
+impl<'tcx> Checker<'tcx> {
+	pub fn new(tcx: &'tcx TyContext<'tcx>) -> Checker<'tcx> {
 		let constants = TyConstants::new(tcx);
 
-		TypeChecker {
+		Checker {
 			tcx,
 			constants,
 			errors: RefCell::new(vec![]),

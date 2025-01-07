@@ -1,5 +1,5 @@
 use seal_ty::{
-	checker::{TypeChecker, parse::parse},
+	checker::{Checker, parse::parse},
 	context::TyContext,
 };
 
@@ -8,7 +8,7 @@ fn run(code: &'static str) -> Result<(), Vec<String>> {
 
 	let ast = result.program;
 	let tcx = TyContext::new();
-	let checker = TypeChecker::new(&tcx);
+	let checker = Checker::new(&tcx);
 
 	checker.check(&ast)
 }

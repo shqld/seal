@@ -1,8 +1,8 @@
 use crate::Ty;
 
-use super::TypeChecker;
+use super::Checker;
 
-impl<'tcx> TypeChecker<'tcx> {
+impl<'tcx> Checker<'tcx> {
 	pub fn satisfies(&self, expected: Ty<'tcx>, actual: Ty<'tcx>) -> bool {
 		use crate::TyKind::*;
 

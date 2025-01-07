@@ -9,9 +9,9 @@ use swc_ecma_ast::{
 
 use crate::{Ty, TyKind, symbol::Symbol};
 
-use super::TypeChecker;
+use super::Checker;
 
-impl<'tcx> TypeChecker<'tcx> {
+impl<'tcx> Checker<'tcx> {
 	pub fn check(self, ast: &Program) -> Result<(), Vec<String>> {
 		self.start_function(&Symbol::new_main(), vec![], self.constants.void);
 

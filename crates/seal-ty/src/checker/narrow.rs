@@ -4,9 +4,9 @@ use swc_ecma_ast::{Expr, MemberExpr, UnaryExpr, UnaryOp};
 
 use crate::{Ty, TyKind, symbol::Symbol};
 
-use super::TypeChecker;
+use super::Checker;
 
-impl<'tcx> TypeChecker<'tcx> {
+impl<'tcx> Checker<'tcx> {
 	pub fn narrow(&self, left: &Expr, right: &Expr) -> Option<Ty<'tcx>> {
 		match (left, right) {
 			(
