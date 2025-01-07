@@ -1,13 +1,16 @@
-use seal_ty::{builder::Sema, checker::parse::parse, context::TyContext};
+use seal_ty::{
+	checker::{TypeChecker, parse::parse},
+	context::TyContext,
+};
 
 fn run(code: &'static str) {
 	let result = parse(code).unwrap();
 
 	let ast = result.program;
 	let tcx = TyContext::new();
-	let sema = Sema::new(&tcx);
+	let checker = TypeChecker::new(&tcx);
 
-	sema.build(&ast);
+	checker.check(&ast).unwrap();
 }
 
 macro_rules! fail {

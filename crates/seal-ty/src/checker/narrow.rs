@@ -1,18 +1,33 @@
 use std::collections::BTreeSet;
 
-use crate::{
-	Ty, TyKind,
-	builder::sir::{Block, Expr},
-};
+use swc_ecma_ast::{Expr, MemberExpr, UnaryExpr, UnaryOp};
+
+use crate::{Ty, TyKind, symbol::Symbol};
 
 use super::TypeChecker;
 
 impl<'tcx> TypeChecker<'tcx> {
-	pub fn narrow(&self, block: &Block<'tcx>, left: &Expr, right: &Expr) -> Option<Ty<'tcx>> {
+	pub fn narrow(&self, left: &Expr, right: &Expr) -> Option<Ty<'tcx>> {
 		match (left, right) {
-			(Expr::TypeOf(arg), value) | (value, Expr::TypeOf(arg)) => {
-				if let Expr::Var(name) = arg.as_ref() {
-					let value_ty = self.build_expr(block, value);
+			(
+				Expr::Unary(UnaryExpr {
+					op: UnaryOp::TypeOf,
+					arg,
+					..
+				}),
+				value,
+			)
+			| (
+				value,
+				Expr::Unary(UnaryExpr {
+					op: UnaryOp::TypeOf,
+					arg,
+					..
+				}),
+			) => {
+				if let Expr::Ident(ident) = arg.as_ref() {
+					let name = Symbol::new(ident.to_id());
+					let value_ty = self.check_expr(value);
 
 					// TODO: seal should allow only const string for rhs of Eq(TypeOf) in Sir?
 					if let TyKind::String(Some(value)) = value_ty.kind() {
@@ -29,12 +44,15 @@ impl<'tcx> TypeChecker<'tcx> {
 					}
 				}
 			}
-			(Expr::Member(obj, prop), value) | (value, Expr::Member(obj, prop)) => {
-				let obj_ty = self.build_expr(block, obj);
+			(Expr::Member(MemberExpr { obj, prop, .. }), value)
+			| (value, Expr::Member(MemberExpr { obj, prop, .. })) => {
+				if let Expr::Ident(ident) = obj.as_ref() {
+					let name = Symbol::new(ident.to_id());
+					let obj_ty = self.check_expr(obj);
+					let prop = &prop.as_ident().unwrap().sym;
 
-				if let Expr::Var(name) = obj.as_ref() {
 					if let TyKind::Union(uni) = obj_ty.kind() {
-						let value_ty = self.build_expr(block, value);
+						let value_ty = self.check_expr(value);
 
 						let narrowed_arms: BTreeSet<_> = uni
 							.arms()

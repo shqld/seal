@@ -1,19 +1,49 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{
-	Ty, TyKind,
-	builder::sir::{Block, Const, Expr, Function, Module, Stmt, Term},
+use swc_ecma_ast::{
+	AssignExpr, AssignTarget, BinExpr, BinaryOp, Decl, Expr, ExprStmt, FnDecl, IfStmt, Lit,
+	MemberExpr, MemberProp, ModuleItem, Pat, Program, Prop, PropOrSpread, ReturnStmt,
+	SimpleAssignTarget, Stmt, TsFnOrConstructorType, TsFnParam, TsKeywordTypeKind, TsLit,
+	TsLitType, TsSatisfiesExpr, TsType, TsTypeLit, TsUnionOrIntersectionType, UnaryOp, VarDeclKind,
 };
+
+use crate::{Ty, TyKind, symbol::Symbol};
 
 use super::TypeChecker;
 
 impl<'tcx> TypeChecker<'tcx> {
-	pub fn check(self, module: &Module<'tcx>) -> Result<(), Vec<String>> {
-		dbg!(&module);
+	pub fn check(self, ast: &Program) -> Result<(), Vec<String>> {
+		self.start_function(&Symbol::new_main(), vec![], self.constants.void);
 
-		for function in &module.functions {
-			self.check_function(function);
-		}
+		match &ast {
+			Program::Script(script) => {
+				for stmt in &script.body {
+					match stmt {
+						Stmt::Return(_) => {
+							// TS(1108)
+							panic!("Return statement is not allowed in the main function");
+						}
+						_ => self.check_stmt(stmt),
+					}
+				}
+			}
+			Program::Module(module) => {
+				for module_item in &module.body {
+					match module_item {
+						ModuleItem::Stmt(stmt) => match stmt {
+							Stmt::Return(_) => {
+								// TS(1108)
+								panic!("Return statement is not allowed in the main function");
+							}
+							_ => self.check_stmt(stmt),
+						},
+						_ => unimplemented!("{:#?}", module_item),
+					}
+				}
+			}
+		};
+
+		self.finish_function();
 
 		if self.errors.borrow().is_empty() {
 			Ok(())
@@ -22,169 +52,309 @@ impl<'tcx> TypeChecker<'tcx> {
 		}
 	}
 
-	pub fn check_function(&self, function: &Function<'tcx>) {
-		let mut param_tys = vec![];
-		for param in &function.params {
-			let ty = param.ty();
-			param_tys.push(ty);
-			self.tcx.set_ty(param.name(), ty);
-		}
+	pub fn check_decl(&self, decl: &Decl) {
+		match decl {
+			Decl::Var(var) => {
+				let is_const = match var.kind {
+					VarDeclKind::Var => panic!("Var is not supported"),
+					VarDeclKind::Const => true,
+					VarDeclKind::Let => false,
+				};
 
-		for block in &function.body {
-			self.check_block(function, block);
-		}
+				for var_declarator in &var.decls {
+					let binding = match &var_declarator.name {
+						Pat::Ident(ident) => ident,
+						_ => unimplemented!("{:#?}", var_declarator.name),
+					};
+					let ty = binding
+						.type_ann
+						.as_ref()
+						.map(|type_ann| self.build_tstype(&type_ann.type_ann))
+						.unwrap_or_else(|| self.tcx.new_infer_ty());
 
-		let ret_ty = function.ret.ty();
-		if !ret_ty.is_void() {
-			let has_assigned_to_ret = function
-				.body
-				.iter()
-				.flat_map(|block| block.stmts())
-				.any(|stmt| matches!(stmt, Stmt::Ret(_)));
+					let binding = Symbol::new(binding.to_id());
 
-			if !has_assigned_to_ret {
-				self.add_error("function does not return".to_string());
-			}
-		}
+					self.add_var_entry(&binding, !is_const);
 
-		let ty = self.tcx.new_function(param_tys, ret_ty);
+					if let Some(init) = &var_declarator.init {
+						let expected = ty;
+						let actual = self.check_expr(init);
 
-		self.tcx.set_ty(&function.name, ty);
-	}
+						// if no type is specified to the declaration, replace with actual type
+						if let TyKind::Infer(_) = ty.kind() {
+							self.tcx.set_ty(&binding, actual);
+							return;
+						}
 
-	pub fn check_block(&self, function: &Function<'tcx>, block: &Block<'tcx>) {
-		for stmt in block.stmts() {
-			self.check_stmt(function, block, stmt);
-		}
-
-		if let Term::Switch(test, cons_block_id, alt_block_id) = block.term().unwrap() {
-			let test_ty = self.build_expr(block, test);
-
-			if let TyKind::Guard(name, narrowed_ty) = test_ty.kind() {
-				self.tcx.override_ty(name, *cons_block_id, *narrowed_ty);
-
-				let current_ty = self.tcx.get_ty(name, block.id()).unwrap();
-
-				if let TyKind::Union(current) = current_ty.kind() {
-					let narrowed_arms = match narrowed_ty.kind() {
-						TyKind::Union(narrowed) => narrowed.arms(),
-						_ => &BTreeSet::from([*narrowed_ty]),
+						if !self.satisfies(expected, actual) {
+							self.raise_type_error(expected, actual);
+						}
+					} else if is_const {
+						panic!("Const variable must be initialized");
 					};
 
-					let rest_arms = current.arms().difference(narrowed_arms).copied().collect();
-
-					// TODO: alt_block does not always conflict with cons_block
-					//       (in the case of an if statement without an else, alt_block will be continue)
-					self.tcx
-						.override_ty(name, *alt_block_id, self.tcx.new_union(rest_arms));
+					self.tcx.set_ty(&binding, ty);
 				}
 			}
-		}
 
-		// TODO: unify vars in block
+			Decl::Fn(FnDecl {
+				ident, function, ..
+			}) => {
+				let name = Symbol::new(ident.to_id());
+				let mut params = vec![];
+				let mut param_tys = vec![];
+
+				for param in &function.params {
+					match &param.pat {
+						Pat::Ident(ident) => {
+							let name = Symbol::new(ident.to_id());
+
+							let ty = match &ident.type_ann {
+								Some(type_ann) => self.build_tstype(&type_ann.type_ann),
+								None => {
+									panic!("Param type annotation is required");
+								}
+							};
+
+							self.tcx.set_ty(&name, ty);
+							params.push(name);
+							param_tys.push(ty);
+						}
+						_ => unimplemented!("{:#?}", param),
+					}
+				}
+
+				let ret_ty = match &function.return_type {
+					Some(type_ann) => self.build_tstype(&type_ann.type_ann),
+					None => {
+						// NOTE: seal does't infer the return type
+						self.constants.void
+					}
+				};
+
+				self.start_function(&name, params, ret_ty);
+
+				let body = match &function.body {
+					Some(body) => body,
+					None => panic!("Function body is required"),
+				};
+
+				for stmt in &body.stmts {
+					self.check_stmt(stmt);
+				}
+
+				if !ret_ty.is_void() && !self.get_current_function_has_returned() {
+					self.add_error("function does not return".to_string());
+				}
+
+				self.finish_function();
+
+				self.tcx
+					.set_ty(&name, self.tcx.new_function(param_tys, ret_ty));
+			}
+			_ => unimplemented!("{:#?}", decl),
+		}
 	}
 
-	pub fn check_stmt(&self, function: &Function<'tcx>, block: &Block<'tcx>, stmt: &Stmt<'tcx>) {
+	pub fn check_stmt(&self, stmt: &Stmt) {
 		match stmt {
-			Stmt::Let(let_) => {
-				let var = let_.var();
-				let name = var.name();
-				let ty = var.ty();
-
-				if let Some(init) = let_.init() {
-					let expected_ty = ty;
-					let actual_ty = self.build_expr(block, init);
-
-					// if no type is specified to the declaration, replace with actual type
-					if let TyKind::Infer(_) = ty.kind() {
-						self.tcx.set_ty(name, actual_ty);
-						return;
-					}
-
-					if !self.satisfies(expected_ty, actual_ty) {
-						self.raise_type_error(expected_ty, actual_ty);
-					}
-				}
-
-				self.tcx.set_ty(name, ty);
+			Stmt::Decl(decl) => self.check_decl(decl),
+			Stmt::Expr(ExprStmt { expr, .. }) => {
+				self.check_expr(expr);
 			}
-			Stmt::Assign(assign) => {
-				let expected_ty = self.tcx.get_ty(assign.left(), block.id()).unwrap();
-				let actual_ty = self.build_expr(block, assign.right());
+			Stmt::Return(ReturnStmt { arg, .. }) => {
+				let expected = self.get_current_function_ret();
 
-				// if no type is specified to the declaration, replace with actual type
-				if let TyKind::Infer(_) = expected_ty.kind() {
-					self.tcx.set_ty(assign.left(), actual_ty);
-					return;
-				}
+				if let Some(arg) = arg {
+					let actual = self.check_expr(arg);
 
-				if !self.satisfies(expected_ty, actual_ty) {
-					self.raise_type_error(expected_ty, actual_ty);
-				}
-			}
-			Stmt::Ret(expr) => {
-				if let Some(expr) = expr {
-					let expected_ty = function.ret.ty();
-					let actual_ty = self.build_expr(block, expr);
-
-					if !self.satisfies(expected_ty, actual_ty) {
-						self.raise_type_error(expected_ty, actual_ty);
+					if !self.satisfies(expected, actual) {
+						self.raise_type_error(expected, actual);
 					}
-				} else if !function.ret.ty().is_void() {
+				} else if !expected.is_void() {
 					self.add_error("expected return value".to_string());
 				}
-			}
-			Stmt::Expr(expr) => {
-				self.build_expr(block, expr);
-			}
-			Stmt::Satisfies(expr, ty) => {
-				let expected_ty = *ty;
-				let actual_ty = self.build_expr(block, expr);
 
-				if !self.satisfies(expected_ty, actual_ty) {
-					self.raise_type_error(expected_ty, actual_ty);
+				self.set_current_function_has_returned(true);
+			}
+			Stmt::If(IfStmt {
+				test, cons, alt, ..
+			}) => {
+				let mut branches = vec![(test, cons)];
+				let mut alt = alt.as_ref();
+
+				while let Some(current_alt) = alt {
+					if let Stmt::If(IfStmt {
+						test,
+						cons,
+						alt: next_alt,
+						..
+					}) = current_alt.as_ref()
+					{
+						branches.push((test, cons));
+						alt = next_alt.as_ref();
+					} else {
+						break;
+					}
+				}
+
+				let mut next_block_id = self.get_current_block_id().next();
+
+				for (test, cons) in branches {
+					let test_ty = self.check_expr(test);
+
+					if let TyKind::Guard(name, narrowed_ty) = test_ty.kind() {
+						self.tcx.override_ty(name, next_block_id, *narrowed_ty);
+
+						let current_ty =
+							self.tcx.get_ty(name, self.get_current_block_id()).unwrap();
+
+						if let TyKind::Union(current) = current_ty.kind() {
+							let narrowed_arms = match narrowed_ty.kind() {
+								TyKind::Union(narrowed) => narrowed.arms(),
+								_ => &BTreeSet::from([*narrowed_ty]),
+							};
+
+							let rest_arms =
+								current.arms().difference(narrowed_arms).copied().collect();
+
+							next_block_id = next_block_id.next();
+
+							self.tcx.override_ty(
+								name,
+								next_block_id,
+								self.tcx.new_union(rest_arms),
+							);
+						}
+					}
+
+					self.push_current_block_id();
+					if let Stmt::Block(block) = cons.as_ref() {
+						for stmt in &block.stmts {
+							self.check_stmt(stmt);
+						}
+					} else {
+						self.check_stmt(cons);
+					}
+					self.pop_current_block_id();
 				}
 			}
+			Stmt::Block(block) => {
+				self.push_current_block_id();
+
+				for stmt in &block.stmts {
+					self.check_stmt(stmt);
+				}
+
+				self.pop_current_block_id();
+			}
+			_ => unimplemented!("{:#?}", stmt),
 		}
 	}
 
-	pub fn build_expr(&self, block: &Block<'tcx>, expr: &Expr) -> Ty<'tcx> {
+	pub fn check_expr(&self, expr: &Expr) -> Ty<'tcx> {
 		match expr {
-			Expr::Const(value) => match value {
-				Const::Boolean(_) => self.constants.boolean,
-				Const::Number(_) => self.constants.number,
-				Const::String(value) => self.tcx.new_const_string(value.clone()),
+			Expr::Assign(AssignExpr { left, right, .. }) => {
+				let binding = match &left {
+					AssignTarget::Simple(target) => match &target {
+						SimpleAssignTarget::Ident(ident) => ident,
+						_ => unimplemented!("{:#?}", target),
+					},
+					_ => unimplemented!("{:#?}", left),
+				};
+				let binding = Symbol::new(binding.to_id());
+
+				if !self.is_var_can_be_assigned(&binding) {
+					panic!("Cannot assign to immutable variable");
+				}
+
+				let expected = self
+					.tcx
+					.get_ty(&binding, self.get_current_block_id())
+					.unwrap();
+				let actual = self.check_expr(right);
+
+				// if no type is specified to the declaration, replace with actual type
+				if let TyKind::Infer(_) = expected.kind() {
+					self.tcx.set_ty(&binding, actual);
+					return actual;
+				}
+
+				if !self.satisfies(expected, actual) {
+					self.raise_type_error(expected, actual);
+				}
+
+				// TODO: actual?
+				expected
+			}
+			Expr::TsSatisfies(TsSatisfiesExpr { expr, type_ann, .. }) => {
+				let expected = self.build_tstype(type_ann);
+				let actual = self.check_expr(expr);
+
+				if !self.satisfies(expected, actual) {
+					self.raise_type_error(expected, actual);
+				}
+
+				actual
+			}
+			Expr::Lit(lit) => match lit {
+				Lit::Bool(_) => self.constants.boolean,
+				Lit::Num(_) => self.constants.number,
+				Lit::Str(value) => self.tcx.new_const_string(value.value.clone()),
+				_ => unimplemented!("{:#?}", lit),
 			},
-			Expr::Var(name) => {
-				if let Some(ty) = self.tcx.get_ty(name, block.id()) {
+			Expr::Ident(ident) => {
+				let name = Symbol::new(ident.to_id());
+
+				if let Some(ty) = self.tcx.get_ty(&name, self.get_current_block_id()) {
 					ty
 				} else {
 					panic!("Type not found: {:?}", name);
 				}
 			}
-			Expr::TypeOf(_) => self.constants.type_of,
-			Expr::Eq(left, right) => {
-				let left_ty = self.build_expr(block, left);
-				let right_ty = self.build_expr(block, right);
 
-				if !self.overlaps(left_ty, right_ty) {
-					// TS(2367)
-					self.add_error(format!("This comparison appears to be unintentional because the types '{left_ty}' and '{right_ty}' have no overlap"));
+			Expr::Unary(unary) => {
+				self.check_expr(&unary.arg);
 
-					return self.constants.err;
+				match unary.op {
+					UnaryOp::TypeOf => self.constants.type_of,
+					_ => unimplemented!("{:#?}", unary),
 				}
-
-				if let Some(narrowed_ty) = self.narrow(block, left, right) {
-					return narrowed_ty;
-				}
-
-				self.constants.boolean
 			}
-			Expr::Member(obj, prop) => {
-				let obj_ty = self.build_expr(block, obj);
+			Expr::Bin(BinExpr {
+				op, left, right, ..
+			}) => {
+				let left_ty = self.check_expr(left);
+				let right_ty = self.check_expr(right);
+
+				match op {
+					BinaryOp::EqEqEq => {
+						if !self.overlaps(left_ty, right_ty) {
+							// TS(2367)
+							self.add_error(format!("This comparison appears to be unintentional because the types '{left_ty}' and '{right_ty}' have no overlap"));
+
+							return self.constants.err;
+						}
+
+						if let Some(narrowed_ty) = self.narrow(left, right) {
+							return narrowed_ty;
+						}
+
+						self.constants.boolean
+					}
+					_ => unimplemented!("{:#?}", op),
+				}
+			}
+			Expr::Member(MemberExpr { obj, prop, .. }) => {
+				let prop = match &prop {
+					MemberProp::Ident(ident) => ident.sym.clone(),
+					_ => unimplemented!("{:#?}", prop),
+				};
+
+				let obj_ty = self.check_expr(obj);
 
 				match obj_ty.kind() {
-					TyKind::Object(obj) => match obj.fields().get(prop) {
+					TyKind::Object(obj) => match obj.fields().get(&prop) {
 						Some(ty) => *ty,
 						None => {
 							// TS(2339)
@@ -199,7 +369,7 @@ impl<'tcx> TypeChecker<'tcx> {
 
 						for arm in uni.arms() {
 							if let TyKind::Object(obj) = arm.kind() {
-								if let Some(prop) = obj.get_prop(prop) {
+								if let Some(prop) = obj.get_prop(&prop) {
 									prop_arms.insert(prop);
 									continue;
 								}
@@ -224,15 +394,27 @@ impl<'tcx> TypeChecker<'tcx> {
 					}
 				}
 			}
-			Expr::Object(fields) => {
-				let mut field_tys = BTreeMap::new();
-				for (key, value) in fields {
-					let ty = self.build_expr(block, value);
-					field_tys.insert(key.clone(), ty);
+			Expr::Object(obj) => {
+				let mut fields = BTreeMap::new();
+
+				for prop in &obj.props {
+					match prop {
+						PropOrSpread::Prop(prop) => match prop.as_ref() {
+							Prop::KeyValue(kv) => {
+								let key = kv.key.as_ident().unwrap().sym.clone();
+								let ty = self.check_expr(&kv.value);
+
+								fields.insert(key, ty);
+							}
+							_ => unimplemented!("{:#?}", prop),
+						},
+						_ => unimplemented!("{:#?}", prop),
+					}
 				}
 
-				self.tcx.new_object(field_tys)
+				self.tcx.new_object(fields)
 			}
+			_ => unimplemented!("{:#?}", expr),
 		}
 	}
 
@@ -246,6 +428,67 @@ impl<'tcx> TypeChecker<'tcx> {
 			));
 		} else {
 			self.add_error(format!("expected '{expected}', got '{actual}'"));
+		}
+	}
+
+	pub fn build_tstype(&self, tstype: &TsType) -> Ty<'tcx> {
+		match tstype {
+			TsType::TsKeywordType(keyword) => match keyword.kind {
+				TsKeywordTypeKind::TsNumberKeyword => self.constants.number,
+				TsKeywordTypeKind::TsStringKeyword => self.constants.string,
+				TsKeywordTypeKind::TsBooleanKeyword => self.constants.boolean,
+				TsKeywordTypeKind::TsVoidKeyword => self.constants.void,
+				TsKeywordTypeKind::TsNeverKeyword => self.constants.never,
+				_ => unimplemented!(),
+			},
+			TsType::TsFnOrConstructorType(fn_or_constructor) => match fn_or_constructor {
+				TsFnOrConstructorType::TsFnType(fn_) => {
+					let ret_ty = self.build_tstype(&fn_.type_ann.type_ann);
+
+					let mut param_tys = vec![];
+					for param in &fn_.params {
+						let ty = match param {
+							TsFnParam::Ident(ident) => {
+								self.build_tstype(&ident.type_ann.as_ref().unwrap().type_ann)
+							}
+							_ => unimplemented!("{:#?}", param),
+						};
+						param_tys.push(ty);
+					}
+
+					self.tcx.new_function(param_tys, ret_ty)
+				}
+				_ => unimplemented!(),
+			},
+			TsType::TsUnionOrIntersectionType(ty) => match ty {
+				TsUnionOrIntersectionType::TsUnionType(ty) => self.tcx.new_union(
+					ty.types
+						.iter()
+						.map(|ty| self.build_tstype(ty))
+						.collect::<BTreeSet<_>>(),
+				),
+				TsUnionOrIntersectionType::TsIntersectionType(_) => unimplemented!(),
+			},
+			TsType::TsLitType(TsLitType { lit, .. }) => match lit {
+				TsLit::Str(str) => self.tcx.new_const_string(str.value.clone()),
+				_ => unimplemented!("{:#?}", lit),
+			},
+			TsType::TsTypeLit(TsTypeLit { members, .. }) => {
+				let mut fields = BTreeMap::new();
+				for member in members {
+					match member {
+						swc_ecma_ast::TsTypeElement::TsPropertySignature(prop) => {
+							let name = prop.key.as_ident().unwrap().sym.clone();
+							let ty = self.build_tstype(&prop.type_ann.as_ref().unwrap().type_ann);
+							fields.insert(name, ty);
+						}
+						_ => unimplemented!("{:#?}", member),
+					}
+				}
+
+				self.tcx.new_object(fields)
+			}
+			_ => unimplemented!("{:#?}", tstype),
 		}
 	}
 }

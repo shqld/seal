@@ -6,7 +6,7 @@ use std::{
 
 use swc_atoms::Atom;
 
-use crate::{Ty, builder::sir::Symbol, infer::InferId};
+use crate::{Ty, infer::InferId, symbol::Symbol};
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub enum TyKind<'tcx> {

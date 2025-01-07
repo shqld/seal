@@ -1,5 +1,4 @@
 use seal_ty::{
-	builder::Sema,
 	checker::{TypeChecker, parse::parse},
 	context::TyContext,
 };
@@ -9,11 +8,9 @@ fn run(code: &'static str) -> Result<(), Vec<String>> {
 
 	let ast = result.program;
 	let tcx = TyContext::new();
-	let sema = Sema::new(&tcx);
-	let sir = sema.build(&ast);
 	let checker = TypeChecker::new(&tcx);
 
-	checker.check(&sir)
+	checker.check(&ast)
 }
 
 macro_rules! pass {
@@ -224,20 +221,20 @@ pass!(
     "#
 );
 
-// TODO: this test unexpectedly passes because the type of 'x' is not narrowed to 'string' after the if statement
-// fail!(
-// 	narrowed_union_,
-// 	r#"
-//         let x: number | string = 42;
+fail!(
+	narrowed_union_,
+	r#"
+        let x: number | string = 42;
 
-//         if (typeof x === 'number') {
-//             x satisfies number;
-//         }
+        if (typeof x === 'number') {
+            x satisfies number;
+        }
 
-//         x satisfies string;
-//     "#,
-// 	&[]
-// );
+        // x: number | string
+        x satisfies string;
+    "#,
+	&["expected 'string', got 'number | string'"]
+);
 
 pass!(
 	assign_to_narrowed_union_,

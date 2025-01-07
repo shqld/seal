@@ -7,11 +7,20 @@ use swc_atoms::Atom;
 
 use crate::{
 	Ty, TyKind,
-	builder::sir::{BlockId, Symbol},
 	infer::InferContext,
 	interner::interner::Interner,
 	kind::{Function, Object, Union},
+	symbol::Symbol,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BlockId(pub usize);
+
+impl BlockId {
+	pub fn next(&self) -> Self {
+		Self(self.0 + 1)
+	}
+}
 
 #[derive(Debug)]
 pub struct TyContext<'tcx> {
@@ -106,19 +115,19 @@ pub struct TyConstants<'tcx> {
 }
 
 impl<'tcx> TyConstants<'tcx> {
-	pub fn new(factory: &'tcx TyContext<'tcx>) -> Self {
+	pub fn new(tcx: &'tcx TyContext<'tcx>) -> Self {
 		Self {
-			boolean: factory.new_ty(TyKind::Boolean),
-			number: factory.new_ty(TyKind::Number),
-			string: factory.new_ty(TyKind::String(None)),
-			err: factory.new_ty(TyKind::Err),
-			void: factory.new_ty(TyKind::Void),
-			never: factory.new_ty(TyKind::Never),
+			boolean: tcx.new_ty(TyKind::Boolean),
+			number: tcx.new_ty(TyKind::Number),
+			string: tcx.new_ty(TyKind::String(None)),
+			err: tcx.new_ty(TyKind::Err),
+			void: tcx.new_ty(TyKind::Void),
+			never: tcx.new_ty(TyKind::Never),
 
-			type_of: factory.new_union(
+			type_of: tcx.new_union(
 				["boolean", "number", "string"]
 					.iter()
-					.map(|s| factory.new_const_string(Atom::new(*s)))
+					.map(|s| tcx.new_const_string(Atom::new(*s)))
 					.collect(),
 			),
 		}

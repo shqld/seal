@@ -1,5 +1,4 @@
 use seal_ty::{
-	builder::Sema,
 	checker::{TypeChecker, parse::parse},
 	context::TyContext,
 };
@@ -9,11 +8,9 @@ fn run(code: &'static str) -> Result<(), Vec<String>> {
 
 	let ast = result.program;
 	let tcx = TyContext::new();
-	let sema = Sema::new(&tcx);
-	let sir = sema.build(&ast);
 	let checker = TypeChecker::new(&tcx);
 
-	checker.check(&sir)
+	checker.check(&ast)
 }
 
 macro_rules! pass {
