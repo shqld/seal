@@ -6,7 +6,10 @@ use std::{
 
 use swc_atoms::Atom;
 
-use crate::{Ty, infer::InferId, symbol::Symbol};
+use crate::{Ty, symbol::Symbol};
+
+#[cfg(feature = "experimental_infer")]
+use crate::infer::InferId;
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub enum TyKind<'tcx> {
@@ -16,11 +19,13 @@ pub enum TyKind<'tcx> {
 	Err,
 	Function(Function<'tcx>),
 	Void,
+	#[cfg(feature = "experimental_infer")]
 	Infer(InferId),
 	Union(Union<'tcx>),
 	Never,
 	Object(Object<'tcx>),
 	Guard(Symbol, Ty<'tcx>),
+	Lazy,
 }
 
 impl Display for TyKind<'_> {
@@ -33,7 +38,9 @@ impl Display for TyKind<'_> {
 				None => write!(f, "string"),
 			},
 			TyKind::Err => write!(f, "<err>"),
+			#[cfg(feature = "experimental_infer")]
 			TyKind::Infer(id) => write!(f, "<infer: {id}>",),
+			TyKind::Lazy => write!(f, "<lazy>",),
 			TyKind::Function(Function { params, ret }) => write!(
 				f,
 				"({}) => {}",
@@ -101,8 +108,12 @@ impl<'tcx> Union<'tcx> {
 						inner.insert(*ty);
 					}
 				}
+				TyKind::Lazy => {
+					unreachable!("Lazy type should be resolved before creating a union");
+				}
+				#[cfg(feature = "experimental_infer")]
 				TyKind::Infer(_) => {
-					panic!("Union type cannot contain infer types");
+					unreachable!("Union type cannot contain infer types");
 				}
 				_ => {
 					inner.insert(ty);

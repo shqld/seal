@@ -3,30 +3,13 @@ use crate::Ty;
 use super::Checker;
 
 impl<'tcx> Checker<'tcx> {
+	#[allow(clippy::only_used_in_recursion)]
 	pub fn satisfies(&self, expected: Ty<'tcx>, actual: Ty<'tcx>) -> bool {
 		use crate::TyKind::*;
 
 		match (expected.kind(), actual.kind()) {
 			// prevent cascading errors
 			(Err, _) => true,
-			// e.g. `let n; n = 1;`
-			(Infer(id), _) => match self.tcx.infer.resolve_ty(*id) {
-				Some(expected) => self.satisfies(expected, actual),
-				None => {
-					self.tcx.infer.add_constraint(*id, expected);
-
-					true
-				}
-			},
-			// e.g. function param types
-			(_, Infer(id)) => match self.tcx.infer.resolve_ty(*id) {
-				Some(actual) => self.satisfies(expected, actual),
-				None => {
-					self.tcx.infer.add_constraint(*id, expected);
-
-					true
-				}
-			},
 			(Function(expected), Function(actual)) => {
 				if expected.params.len() != actual.params.len() {
 					return false;
@@ -53,6 +36,28 @@ impl<'tcx> Checker<'tcx> {
 			(Union(expected), _) => expected.arms().iter().any(|ty| self.satisfies(*ty, actual)),
 			(String(None), String(_)) => true,
 			(Boolean, Guard(_, _)) | (Guard(_, _), Boolean) => true,
+
+			#[cfg(feature = "experimental_infer")]
+			// e.g. `let n; n = 1;`
+			(Infer(id), _) => match self.tcx.infer.resolve_ty(*id) {
+				Some(expected) => self.satisfies(expected, actual),
+				None => {
+					self.tcx.infer.add_constraint(*id, expected);
+
+					true
+				}
+			},
+			#[cfg(feature = "experimental_infer")]
+			// e.g. function param types
+			(_, Infer(id)) => match self.tcx.infer.resolve_ty(*id) {
+				Some(actual) => self.satisfies(expected, actual),
+				None => {
+					self.tcx.infer.add_constraint(*id, expected);
+
+					true
+				}
+			},
+
 			_ => expected == actual,
 		}
 	}

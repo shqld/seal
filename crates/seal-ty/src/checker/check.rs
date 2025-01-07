@@ -70,7 +70,7 @@ impl<'tcx> Checker<'tcx> {
 						.type_ann
 						.as_ref()
 						.map(|type_ann| self.build_tstype(&type_ann.type_ann))
-						.unwrap_or_else(|| self.tcx.new_infer_ty());
+						.unwrap_or_else(|| self.constants.lazy);
 
 					let binding = Symbol::new(binding.to_id());
 
@@ -79,7 +79,7 @@ impl<'tcx> Checker<'tcx> {
 						let actual = self.check_expr(init);
 
 						// if no type is specified to the declaration, replace with actual type
-						if let TyKind::Infer(_) = ty.kind() {
+						if let TyKind::Lazy = ty.kind() {
 							self.add_var(&binding, actual, !is_const);
 							return;
 						}
@@ -259,7 +259,7 @@ impl<'tcx> Checker<'tcx> {
 				let actual = self.check_expr(right);
 
 				// if no type is specified to the declaration, replace with actual type
-				if let TyKind::Infer(_) = expected.kind() {
+				if let TyKind::Lazy = expected.kind() {
 					self.add_var(&binding, actual, true);
 					return actual;
 				}

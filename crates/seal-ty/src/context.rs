@@ -4,15 +4,18 @@ use swc_atoms::Atom;
 
 use crate::{
 	Ty, TyKind,
-	infer::InferContext,
 	interner::interner::Interner,
 	kind::{Function, Object, Union},
 	symbol::Symbol,
 };
 
+#[cfg(feature = "experimental_infer")]
+use crate::infer::InferContext;
+
 #[derive(Debug)]
 pub struct TyContext<'tcx> {
 	interner: Interner<'tcx, TyKind<'tcx>>,
+	#[cfg(feature = "experimental_infer")]
 	pub infer: InferContext<'tcx>,
 }
 
@@ -21,6 +24,7 @@ impl TyContext<'_> {
 	pub fn new() -> Self {
 		Self {
 			interner: Interner::new(),
+			#[cfg(feature = "experimental_infer")]
 			infer: InferContext::new(),
 		}
 	}
@@ -35,6 +39,7 @@ impl<'tcx> TyContext<'tcx> {
 		self.new_ty(TyKind::String(Some(value)))
 	}
 
+	#[cfg(feature = "experimental_infer")]
 	pub fn new_infer_ty(&'tcx self) -> Ty<'tcx> {
 		let id = self.infer.new_id();
 		Ty::new(self.interner.intern(TyKind::Infer(id)))
@@ -76,6 +81,7 @@ pub struct TyConstants<'tcx> {
 	pub err: Ty<'tcx>,
 	pub void: Ty<'tcx>,
 	pub never: Ty<'tcx>,
+	pub lazy: Ty<'tcx>,
 
 	pub type_of: Ty<'tcx>,
 }
@@ -89,6 +95,7 @@ impl<'tcx> TyConstants<'tcx> {
 			err: tcx.new_ty(TyKind::Err),
 			void: tcx.new_ty(TyKind::Void),
 			never: tcx.new_ty(TyKind::Never),
+			lazy: tcx.new_ty(TyKind::Lazy),
 
 			type_of: tcx.new_union(
 				["boolean", "number", "string"]
