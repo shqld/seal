@@ -37,27 +37,6 @@ impl<'tcx> Checker<'tcx> {
 			(String(None), String(_)) => true,
 			(Boolean, Guard(_, _)) | (Guard(_, _), Boolean) => true,
 
-			#[cfg(feature = "experimental_infer")]
-			// e.g. `let n; n = 1;`
-			(Infer(id), _) => match self.tcx.infer.resolve_ty(*id) {
-				Some(expected) => self.satisfies(expected, actual),
-				None => {
-					self.tcx.infer.add_constraint(*id, expected);
-
-					true
-				}
-			},
-			#[cfg(feature = "experimental_infer")]
-			// e.g. function param types
-			(_, Infer(id)) => match self.tcx.infer.resolve_ty(*id) {
-				Some(actual) => self.satisfies(expected, actual),
-				None => {
-					self.tcx.infer.add_constraint(*id, expected);
-
-					true
-				}
-			},
-
 			_ => expected == actual,
 		}
 	}

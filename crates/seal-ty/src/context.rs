@@ -9,14 +9,9 @@ use crate::{
 	symbol::Symbol,
 };
 
-#[cfg(feature = "experimental_infer")]
-use crate::infer::InferContext;
-
 #[derive(Debug)]
 pub struct TyContext<'tcx> {
 	interner: Interner<'tcx, TyKind<'tcx>>,
-	#[cfg(feature = "experimental_infer")]
-	pub infer: InferContext<'tcx>,
 }
 
 impl TyContext<'_> {
@@ -24,8 +19,6 @@ impl TyContext<'_> {
 	pub fn new() -> Self {
 		Self {
 			interner: Interner::new(),
-			#[cfg(feature = "experimental_infer")]
-			infer: InferContext::new(),
 		}
 	}
 }
@@ -37,12 +30,6 @@ impl<'tcx> TyContext<'tcx> {
 
 	pub fn new_const_string(&'tcx self, value: Atom) -> Ty<'tcx> {
 		self.new_ty(TyKind::String(Some(value)))
-	}
-
-	#[cfg(feature = "experimental_infer")]
-	pub fn new_infer_ty(&'tcx self) -> Ty<'tcx> {
-		let id = self.infer.new_id();
-		Ty::new(self.interner.intern(TyKind::Infer(id)))
 	}
 
 	pub fn new_function(&'tcx self, params: Vec<Ty<'tcx>>, ret: Ty<'tcx>) -> Ty<'tcx> {
