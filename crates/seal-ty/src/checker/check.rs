@@ -74,15 +74,13 @@ impl<'tcx> Checker<'tcx> {
 
 					let binding = Symbol::new(binding.to_id());
 
-					self.add_var_entry(&binding, !is_const);
-
 					if let Some(init) = &var_declarator.init {
 						let expected = ty;
 						let actual = self.check_expr(init);
 
 						// if no type is specified to the declaration, replace with actual type
 						if let TyKind::Infer(_) = ty.kind() {
-							self.set_ty(&binding, actual);
+							self.add_var(&binding, actual, !is_const);
 							return;
 						}
 
@@ -93,7 +91,7 @@ impl<'tcx> Checker<'tcx> {
 						panic!("Const variable must be initialized");
 					};
 
-					self.set_ty(&binding, ty);
+					self.add_var(&binding, ty, !is_const);
 				}
 			}
 
@@ -102,7 +100,6 @@ impl<'tcx> Checker<'tcx> {
 			}) => {
 				let name = Symbol::new(ident.to_id());
 				let mut params = vec![];
-				let mut param_tys = vec![];
 
 				for param in &function.params {
 					match &param.pat {
@@ -116,9 +113,7 @@ impl<'tcx> Checker<'tcx> {
 								}
 							};
 
-							self.set_ty(&name, ty);
-							params.push(name);
-							param_tys.push(ty);
+							params.push((name, ty));
 						}
 						_ => unimplemented!("{:#?}", param),
 					}
@@ -148,8 +143,6 @@ impl<'tcx> Checker<'tcx> {
 				}
 
 				self.finish_function();
-
-				self.set_ty(&name, self.tcx.new_function(param_tys, ret_ty));
 			}
 			_ => unimplemented!("{:#?}", decl),
 		}
@@ -197,15 +190,15 @@ impl<'tcx> Checker<'tcx> {
 					}
 				}
 
-				let mut next_block_id = self.get_current_block_id().next();
+				let mut next_scope = self.get_current_scope().next();
 
 				for (test, cons) in branches {
 					let test_ty = self.check_expr(test);
 
 					if let TyKind::Guard(name, narrowed_ty) = test_ty.kind() {
-						self.override_ty(name, next_block_id, *narrowed_ty);
+						self.add_scoped_ty(name, next_scope, *narrowed_ty);
 
-						let current_ty = self.get_ty(name, self.get_current_block_id()).unwrap();
+						let current_ty = self.get_var_ty(name).unwrap();
 
 						if let TyKind::Union(current) = current_ty.kind() {
 							let narrowed_arms = match narrowed_ty.kind() {
@@ -216,13 +209,15 @@ impl<'tcx> Checker<'tcx> {
 							let rest_arms =
 								current.arms().difference(narrowed_arms).copied().collect();
 
-							next_block_id = next_block_id.next();
-
-							self.override_ty(name, next_block_id, self.tcx.new_union(rest_arms));
+							self.add_scoped_ty(
+								name,
+								next_scope.next(),
+								self.tcx.new_union(rest_arms),
+							);
 						}
 					}
 
-					self.push_current_block_id();
+					self.enter_new_scope();
 					if let Stmt::Block(block) = cons.as_ref() {
 						for stmt in &block.stmts {
 							self.check_stmt(stmt);
@@ -230,17 +225,15 @@ impl<'tcx> Checker<'tcx> {
 					} else {
 						self.check_stmt(cons);
 					}
-					self.pop_current_block_id();
+					self.leave_current_scope();
+
+					next_scope = next_scope.next();
 				}
 			}
 			Stmt::Block(block) => {
-				self.push_current_block_id();
-
 				for stmt in &block.stmts {
 					self.check_stmt(stmt);
 				}
-
-				self.pop_current_block_id();
 			}
 			_ => unimplemented!("{:#?}", stmt),
 		}
@@ -258,16 +251,16 @@ impl<'tcx> Checker<'tcx> {
 				};
 				let binding = Symbol::new(binding.to_id());
 
-				if !self.is_var_can_be_assigned(&binding) {
+				if !self.get_var_is_assignable(&binding).unwrap() {
 					panic!("Cannot assign to immutable variable");
 				}
 
-				let expected = self.get_ty(&binding, self.get_current_block_id()).unwrap();
+				let expected = self.get_var_ty(&binding).unwrap();
 				let actual = self.check_expr(right);
 
 				// if no type is specified to the declaration, replace with actual type
 				if let TyKind::Infer(_) = expected.kind() {
-					self.set_ty(&binding, actual);
+					self.add_var(&binding, actual, true);
 					return actual;
 				}
 
@@ -297,7 +290,7 @@ impl<'tcx> Checker<'tcx> {
 			Expr::Ident(ident) => {
 				let name = Symbol::new(ident.to_id());
 
-				if let Some(ty) = self.get_ty(&name, self.get_current_block_id()) {
+				if let Some(ty) = self.get_var_ty(&name) {
 					ty
 				} else {
 					panic!("Type not found: {:?}", name);

@@ -10,15 +10,6 @@ use crate::{
 	symbol::Symbol,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct BlockId(pub usize);
-
-impl BlockId {
-	pub fn next(&self) -> Self {
-		Self(self.0 + 1)
-	}
-}
-
 #[derive(Debug)]
 pub struct TyContext<'tcx> {
 	interner: Interner<'tcx, TyKind<'tcx>>,

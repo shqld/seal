@@ -2,38 +2,42 @@ pub mod check;
 mod narrow;
 pub mod parse;
 mod satisfies;
+mod scope;
 
-use std::{
-	cell::{Cell, RefCell},
-	collections::HashMap,
-};
+use std::{cell::RefCell, collections::HashMap};
+
+use scope::{ScopeStack, TyScope};
 
 use crate::{
 	Ty,
-	context::{BlockId, TyConstants, TyContext},
+	context::{TyConstants, TyContext},
 	symbol::Symbol,
 };
 
-struct VarInfo {
-	can_be_assigned: bool,
-}
-
-pub struct Function<'tcx> {
+#[derive(Debug)]
+struct Function<'tcx> {
 	name: Symbol,
 	ret: Ty<'tcx>,
-	vars: HashMap<Symbol, VarInfo>,
-	block_ids: Vec<BlockId>,
+	params: Vec<Ty<'tcx>>,
 	has_returned: bool,
+	root_scope: TyScope,
 }
 
+#[derive(Debug)]
+struct Var<'tcx> {
+	ty: Ty<'tcx>,
+	is_assignable: bool,
+	scoped_tys: HashMap<TyScope, Ty<'tcx>>,
+}
+
+#[derive(Debug)]
 pub struct Checker<'tcx> {
 	tcx: &'tcx TyContext<'tcx>,
-	types: RefCell<HashMap<Symbol, Ty<'tcx>>>,
-	type_overrides: RefCell<HashMap<(Symbol, BlockId), Ty<'tcx>>>,
+	vars: RefCell<HashMap<Symbol, Var<'tcx>>>,
 	constants: TyConstants<'tcx>,
 	errors: RefCell<Vec<String>>,
 	functions: RefCell<Vec<Function<'tcx>>>,
-	block_id_counter: Cell<usize>,
+	scopes: RefCell<ScopeStack>,
 }
 
 impl<'tcx> Checker<'tcx> {
@@ -42,62 +46,80 @@ impl<'tcx> Checker<'tcx> {
 
 		Checker {
 			tcx,
-			types: RefCell::new(HashMap::new()),
-			type_overrides: RefCell::new(HashMap::new()),
+			vars: RefCell::new(HashMap::new()),
 			constants,
 			errors: RefCell::new(vec![]),
 			functions: RefCell::new(vec![]),
-			block_id_counter: Cell::new(0),
+			scopes: RefCell::new(ScopeStack::new()),
 		}
 	}
 
-	pub fn get_ty(&self, id: &Symbol, block_id: BlockId) -> Option<Ty<'tcx>> {
-		self.type_overrides
+	pub fn get_var_ty(&self, id: &Symbol) -> Option<Ty<'tcx>> {
+		let scope = self.get_current_scope();
+
+		self.vars
 			.borrow()
-			.get(&(id.clone(), block_id))
-			.cloned()
-			.or_else(|| self.types.borrow().get(id).cloned())
+			.get(id)
+			.map(|var| var.scoped_tys.get(&scope).copied().unwrap_or(var.ty))
 	}
 
-	pub fn set_ty(&self, id: &Symbol, ty: Ty<'tcx>) {
-		self.types.borrow_mut().insert(id.clone(), ty);
+	pub fn get_var_is_assignable(&self, id: &Symbol) -> Option<bool> {
+		self.vars.borrow().get(id).map(|var| var.is_assignable)
 	}
 
-	pub fn override_ty(&self, id: &Symbol, block_id: BlockId, ty: Ty<'tcx>) {
-		self.type_overrides
-			.borrow_mut()
-			.insert((id.clone(), block_id), ty);
+	pub fn add_var(&self, id: &Symbol, ty: Ty<'tcx>, is_assignable: bool) {
+		self.vars.borrow_mut().insert(id.clone(), Var {
+			ty,
+			is_assignable,
+			scoped_tys: HashMap::new(),
+		});
+	}
+
+	pub fn add_scoped_ty(&self, id: &Symbol, scope: TyScope, ty: Ty<'tcx>) {
+		let mut vars = self.vars.borrow_mut();
+
+		if let Some(var) = vars.get_mut(id) {
+			var.scoped_tys.insert(scope, ty);
+		}
 	}
 
 	pub fn add_error(&self, error: String) {
 		self.errors.borrow_mut().push(error);
 	}
 
-	fn new_block_id(&self) -> BlockId {
-		let id = self.block_id_counter.get();
-		self.block_id_counter.set(id + 1);
-		BlockId(id)
-	}
+	pub fn start_function(&self, name: &Symbol, params: Vec<(Symbol, Ty<'tcx>)>, ret: Ty<'tcx>) {
+		let mut param_tys = vec![];
 
-	pub fn start_function(&self, name: &Symbol, params: Vec<Symbol>, ret: Ty<'tcx>) {
+		for (name, ty) in &params {
+			let ty = *ty;
+
+			param_tys.push(ty);
+			self.add_var(name, ty, false);
+		}
+
+		let root_scope = self.enter_new_scope();
+
 		self.functions.borrow_mut().push(Function {
 			name: name.clone(),
 			ret,
-			vars: params
-				.into_iter()
-				.map(|param| {
-					(param, VarInfo {
-						can_be_assigned: false,
-					})
-				})
-				.collect(),
-			block_ids: vec![self.new_block_id()],
+			params: param_tys,
 			has_returned: false,
+			root_scope,
 		});
 	}
 
-	pub fn finish_function(&self) -> Function<'tcx> {
-		self.functions.borrow_mut().pop().unwrap()
+	pub fn finish_function(&self) {
+		let function = self.functions.borrow_mut().pop().unwrap();
+
+		assert_eq!(function.root_scope, self.get_current_scope());
+
+		self.leave_current_scope();
+
+		self.add_var(
+			&function.name,
+			self.tcx.new_function(function.params, function.ret),
+			false,
+		);
 	}
 
 	pub fn get_current_function_ret(&self) -> Ty<'tcx> {
@@ -112,52 +134,15 @@ impl<'tcx> Checker<'tcx> {
 		self.functions.borrow_mut().last_mut().unwrap().has_returned = has_returned;
 	}
 
-	pub fn get_current_block_id(&self) -> BlockId {
-		*self
-			.functions
-			.borrow()
-			.last()
-			.unwrap()
-			.block_ids
-			.last()
-			.unwrap()
+	pub fn get_current_scope(&self) -> TyScope {
+		self.scopes.borrow().peek()
 	}
 
-	pub fn push_current_block_id(&self) {
-		self.functions
-			.borrow_mut()
-			.last_mut()
-			.unwrap()
-			.block_ids
-			.push(self.new_block_id());
+	pub fn enter_new_scope(&self) -> TyScope {
+		self.scopes.borrow_mut().push()
 	}
 
-	pub fn pop_current_block_id(&self) {
-		self.functions
-			.borrow_mut()
-			.last_mut()
-			.unwrap()
-			.block_ids
-			.pop();
-	}
-
-	pub fn add_var_entry(&self, symbol: &Symbol, can_be_assigned: bool) {
-		self.functions
-			.borrow_mut()
-			.last_mut()
-			.unwrap()
-			.vars
-			.insert(symbol.clone(), VarInfo { can_be_assigned });
-	}
-
-	pub fn is_var_can_be_assigned(&self, symbol: &Symbol) -> bool {
-		self.functions
-			.borrow()
-			.last()
-			.unwrap()
-			.vars
-			.get(symbol)
-			.unwrap()
-			.can_be_assigned
+	pub fn leave_current_scope(&self) {
+		self.scopes.borrow_mut().pop();
 	}
 }

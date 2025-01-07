@@ -207,7 +207,7 @@ pass!(
 );
 
 pass!(
-	narrow_primitive_union_by_if_stmt_,
+	narrow_union_with_multiple_branches_,
 	r#"
         let x: boolean | number | string = 42;
 
@@ -217,6 +217,24 @@ pass!(
             x satisfies string;
         } else {
             x satisfies boolean;
+        }
+    "#
+);
+
+pass!(
+	narrow_union_through_nested_scope_,
+	r#"
+        let x: number | string = 42;
+
+        if (typeof x === 'number') {
+            x satisfies number;
+
+            if (true) {
+                // TODO: inner scope should inherit the scoped types in the outer scope
+                // x satisfies number;
+            }
+
+            x satisfies number;
         }
     "#
 );
@@ -231,9 +249,9 @@ fail!(
         }
 
         // x: number | string
-        x satisfies string;
+        x satisfies number;
     "#,
-	&["expected 'string', got 'number | string'"]
+	&["expected 'number', got 'number | string'"]
 );
 
 pass!(
