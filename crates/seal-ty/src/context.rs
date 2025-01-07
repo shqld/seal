@@ -1,7 +1,4 @@
-use std::{
-	cell::RefCell,
-	collections::{BTreeMap, BTreeSet, HashMap},
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use swc_atoms::Atom;
 
@@ -26,37 +23,15 @@ impl BlockId {
 pub struct TyContext<'tcx> {
 	interner: Interner<'tcx, TyKind<'tcx>>,
 	pub infer: InferContext<'tcx>,
-	types: RefCell<HashMap<Symbol, Ty<'tcx>>>,
-	type_overrides: RefCell<HashMap<(Symbol, BlockId), Ty<'tcx>>>,
 }
 
-impl<'tcx> TyContext<'tcx> {
+impl TyContext<'_> {
 	#[allow(clippy::new_without_default)]
 	pub fn new() -> Self {
 		Self {
 			interner: Interner::new(),
 			infer: InferContext::new(),
-			types: RefCell::new(HashMap::new()),
-			type_overrides: RefCell::new(HashMap::new()),
 		}
-	}
-
-	pub fn get_ty(&self, id: &Symbol, block_id: BlockId) -> Option<Ty<'tcx>> {
-		self.type_overrides
-			.borrow()
-			.get(&(id.clone(), block_id))
-			.cloned()
-			.or_else(|| self.types.borrow().get(id).cloned())
-	}
-
-	pub fn set_ty(&self, id: &Symbol, ty: Ty<'tcx>) {
-		self.types.borrow_mut().insert(id.clone(), ty);
-	}
-
-	pub fn override_ty(&self, id: &Symbol, block_id: BlockId, ty: Ty<'tcx>) {
-		self.type_overrides
-			.borrow_mut()
-			.insert((id.clone(), block_id), ty);
 	}
 }
 

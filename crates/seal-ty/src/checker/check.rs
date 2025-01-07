@@ -82,7 +82,7 @@ impl<'tcx> Checker<'tcx> {
 
 						// if no type is specified to the declaration, replace with actual type
 						if let TyKind::Infer(_) = ty.kind() {
-							self.tcx.set_ty(&binding, actual);
+							self.set_ty(&binding, actual);
 							return;
 						}
 
@@ -93,7 +93,7 @@ impl<'tcx> Checker<'tcx> {
 						panic!("Const variable must be initialized");
 					};
 
-					self.tcx.set_ty(&binding, ty);
+					self.set_ty(&binding, ty);
 				}
 			}
 
@@ -116,7 +116,7 @@ impl<'tcx> Checker<'tcx> {
 								}
 							};
 
-							self.tcx.set_ty(&name, ty);
+							self.set_ty(&name, ty);
 							params.push(name);
 							param_tys.push(ty);
 						}
@@ -149,8 +149,7 @@ impl<'tcx> Checker<'tcx> {
 
 				self.finish_function();
 
-				self.tcx
-					.set_ty(&name, self.tcx.new_function(param_tys, ret_ty));
+				self.set_ty(&name, self.tcx.new_function(param_tys, ret_ty));
 			}
 			_ => unimplemented!("{:#?}", decl),
 		}
@@ -204,10 +203,9 @@ impl<'tcx> Checker<'tcx> {
 					let test_ty = self.check_expr(test);
 
 					if let TyKind::Guard(name, narrowed_ty) = test_ty.kind() {
-						self.tcx.override_ty(name, next_block_id, *narrowed_ty);
+						self.override_ty(name, next_block_id, *narrowed_ty);
 
-						let current_ty =
-							self.tcx.get_ty(name, self.get_current_block_id()).unwrap();
+						let current_ty = self.get_ty(name, self.get_current_block_id()).unwrap();
 
 						if let TyKind::Union(current) = current_ty.kind() {
 							let narrowed_arms = match narrowed_ty.kind() {
@@ -220,11 +218,7 @@ impl<'tcx> Checker<'tcx> {
 
 							next_block_id = next_block_id.next();
 
-							self.tcx.override_ty(
-								name,
-								next_block_id,
-								self.tcx.new_union(rest_arms),
-							);
+							self.override_ty(name, next_block_id, self.tcx.new_union(rest_arms));
 						}
 					}
 
@@ -268,15 +262,12 @@ impl<'tcx> Checker<'tcx> {
 					panic!("Cannot assign to immutable variable");
 				}
 
-				let expected = self
-					.tcx
-					.get_ty(&binding, self.get_current_block_id())
-					.unwrap();
+				let expected = self.get_ty(&binding, self.get_current_block_id()).unwrap();
 				let actual = self.check_expr(right);
 
 				// if no type is specified to the declaration, replace with actual type
 				if let TyKind::Infer(_) = expected.kind() {
-					self.tcx.set_ty(&binding, actual);
+					self.set_ty(&binding, actual);
 					return actual;
 				}
 
@@ -306,7 +297,7 @@ impl<'tcx> Checker<'tcx> {
 			Expr::Ident(ident) => {
 				let name = Symbol::new(ident.to_id());
 
-				if let Some(ty) = self.tcx.get_ty(&name, self.get_current_block_id()) {
+				if let Some(ty) = self.get_ty(&name, self.get_current_block_id()) {
 					ty
 				} else {
 					panic!("Type not found: {:?}", name);

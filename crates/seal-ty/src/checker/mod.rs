@@ -28,6 +28,8 @@ pub struct Function<'tcx> {
 
 pub struct Checker<'tcx> {
 	tcx: &'tcx TyContext<'tcx>,
+	types: RefCell<HashMap<Symbol, Ty<'tcx>>>,
+	type_overrides: RefCell<HashMap<(Symbol, BlockId), Ty<'tcx>>>,
 	constants: TyConstants<'tcx>,
 	errors: RefCell<Vec<String>>,
 	functions: RefCell<Vec<Function<'tcx>>>,
@@ -40,11 +42,31 @@ impl<'tcx> Checker<'tcx> {
 
 		Checker {
 			tcx,
+			types: RefCell::new(HashMap::new()),
+			type_overrides: RefCell::new(HashMap::new()),
 			constants,
 			errors: RefCell::new(vec![]),
 			functions: RefCell::new(vec![]),
 			block_id_counter: Cell::new(0),
 		}
+	}
+
+	pub fn get_ty(&self, id: &Symbol, block_id: BlockId) -> Option<Ty<'tcx>> {
+		self.type_overrides
+			.borrow()
+			.get(&(id.clone(), block_id))
+			.cloned()
+			.or_else(|| self.types.borrow().get(id).cloned())
+	}
+
+	pub fn set_ty(&self, id: &Symbol, ty: Ty<'tcx>) {
+		self.types.borrow_mut().insert(id.clone(), ty);
+	}
+
+	pub fn override_ty(&self, id: &Symbol, block_id: BlockId, ty: Ty<'tcx>) {
+		self.type_overrides
+			.borrow_mut()
+			.insert((id.clone(), block_id), ty);
 	}
 
 	pub fn add_error(&self, error: String) {
