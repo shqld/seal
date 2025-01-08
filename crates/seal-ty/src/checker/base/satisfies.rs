@@ -1,8 +1,8 @@
 use crate::Ty;
 
-use super::Checker;
+use super::BaseChecker;
 
-impl<'tcx> Checker<'tcx> {
+impl<'tcx> BaseChecker<'tcx> {
 	#[allow(clippy::only_used_in_recursion)]
 	pub fn satisfies(&self, expected: Ty<'tcx>, actual: Ty<'tcx>) -> bool {
 		use crate::TyKind::*;
