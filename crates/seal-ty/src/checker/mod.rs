@@ -1,6 +1,5 @@
 pub mod check;
 mod narrow;
-pub mod parse;
 mod satisfies;
 mod scope;
 

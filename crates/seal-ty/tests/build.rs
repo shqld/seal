@@ -1,7 +1,4 @@
-use seal_ty::{
-	checker::{Checker, parse::parse},
-	context::TyContext,
-};
+use seal_ty::{checker::Checker, context::TyContext, parse::parse};
 
 fn run(code: &'static str) {
 	let result = parse(code).unwrap();
