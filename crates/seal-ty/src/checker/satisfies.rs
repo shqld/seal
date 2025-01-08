@@ -9,7 +9,9 @@ impl<'tcx> Checker<'tcx> {
 
 		match (expected.kind(), actual.kind()) {
 			// prevent cascading errors
-			(Err, _) => true,
+			(Err, _) | (_, Err) => true,
+			(Never, _) | (_, Never) => false,
+			(Lazy, _) | (_, Lazy) => panic!("Lazy types should not be present in satisfies"),
 			(Function(expected), Function(actual)) => {
 				if expected.params.len() != actual.params.len() {
 					return false;
@@ -35,8 +37,7 @@ impl<'tcx> Checker<'tcx> {
 			}),
 			(Union(expected), _) => expected.arms().iter().any(|ty| self.satisfies(*ty, actual)),
 			(String(None), String(_)) => true,
-			(Boolean, Guard(_, _)) | (Guard(_, _), Boolean) => true,
-
+			(Boolean, Guard(_, _)) => true,
 			_ => expected == actual,
 		}
 	}
