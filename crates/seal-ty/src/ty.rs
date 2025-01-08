@@ -3,7 +3,7 @@ use std::{
 	ops::Deref,
 };
 
-use crate::{interner::interned::Interned, kind::TyKind};
+use crate::{intern::interned::Interned, kind::TyKind};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Ty<'tcx>(Interned<'tcx, TyKind<'tcx>>);

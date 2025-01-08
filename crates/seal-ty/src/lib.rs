@@ -1,6 +1,6 @@
 pub mod checker;
 pub mod context;
-mod interner;
+mod intern;
 mod kind;
 pub mod symbol;
 mod ty;

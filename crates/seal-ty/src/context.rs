@@ -4,7 +4,7 @@ use swc_atoms::Atom;
 
 use crate::{
 	Ty, TyKind,
-	interner::interner::Interner,
+	intern::interner::Interner,
 	kind::{Function, Object, Union},
 	symbol::Symbol,
 };
