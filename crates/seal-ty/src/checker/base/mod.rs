@@ -43,7 +43,7 @@ impl<'tcx> BaseChecker<'tcx> {
 		}
 	}
 
-	pub fn check(self) -> Result<(), Vec<String>> {
+	pub fn into_result(self) -> Result<(), Vec<String>> {
 		let errors = self.errors.into_inner();
 
 		if errors.is_empty() {

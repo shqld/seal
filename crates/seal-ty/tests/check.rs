@@ -375,3 +375,77 @@ fail!(
 		"This comparison appears to be unintentional because the types 'number' and '\"hello\"' have no overlap"
 	]
 );
+
+pass!(
+	expr_closure_,
+	r#"
+        let x = 42;
+        let f = () => x;
+
+        f satisfies () => number;
+    "#
+);
+
+pass!(
+	expr_closure_with_ret_type_ann_,
+	r#"
+        let x = 42;
+        let f = (): number => x;
+
+        f satisfies () => number;
+    "#
+);
+
+fail!(
+	expr_closure_ret_missmatch_,
+	r#"
+        let x = 42;
+        let f = (): string => x;
+    "#,
+	&["expected 'string', got 'number'"]
+);
+
+pass!(
+	block_closure_,
+	r#"
+        let x = 42;
+        let f = (): number => {
+            return x;
+        };
+
+        f satisfies () => number;
+    "#
+);
+
+pass!(
+	block_closure_without_ret_type_ann_,
+	r#"
+        let x = 42;
+        let f = () => {};
+
+        f satisfies () => void;
+    "#
+);
+
+fail!(
+	block_closure_ret_mismatch_,
+	r#"
+        let x = 42;
+        let f = (): void => {
+            return x;
+        };
+    "#,
+	&["expected 'void', got 'number'"]
+);
+
+fail!(
+	block_closure_ret_mismatch_without_ret_type_ann_,
+	r#"
+        let x = 42;
+        let f = () => {
+            // void is expected for return type because the annotation is missing
+            return x;
+        };
+    "#,
+	&["expected 'void', got 'number'"]
+);

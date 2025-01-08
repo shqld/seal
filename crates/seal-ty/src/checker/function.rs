@@ -1,6 +1,6 @@
 use std::{cell::Cell, ops::Deref};
 
-use swc_ecma_ast::{Function, ReturnStmt, Stmt};
+use swc_ecma_ast::{BlockStmt, Function, ReturnStmt, Stmt};
 
 use super::base::BaseChecker;
 use super::scope::TyScope;
@@ -9,7 +9,7 @@ use crate::{Ty, TyKind, context::TyContext, symbol::Symbol};
 
 #[derive(Debug)]
 pub struct FunctionChecker<'tcx> {
-	pub base: BaseChecker<'tcx>,
+	base: BaseChecker<'tcx>,
 	ret: Ty<'tcx>,
 	has_returned: Cell<bool>,
 	root_scope: TyScope,
@@ -45,12 +45,20 @@ impl<'tcx> FunctionChecker<'tcx> {
 		}
 	}
 
-	pub fn check(self, function: &Function) -> Result<(), Vec<String>> {
+	pub fn into_result(self) -> Result<(), Vec<String>> {
+		self.base.into_result()
+	}
+
+	pub fn check_function(&self, function: &Function) {
 		let body = match &function.body {
 			Some(body) => body,
 			None => panic!("Function body is required"),
 		};
 
+		self.check_body(body);
+	}
+
+	pub fn check_body(&self, body: &BlockStmt) {
 		for stmt in &body.stmts {
 			self.check_stmt(stmt);
 		}
@@ -62,8 +70,6 @@ impl<'tcx> FunctionChecker<'tcx> {
 		assert_eq!(self.root_scope, self.get_current_scope());
 
 		self.leave_current_scope();
-
-		self.base.check()
 	}
 
 	pub fn check_stmt(&self, stmt: &Stmt) {

@@ -47,7 +47,7 @@ impl<'tcx> Checker<'tcx> {
 			}
 		};
 
-		self.base.check()
+		self.base.into_result()
 	}
 
 	pub fn check_stmt(&self, stmt: &Stmt) {
@@ -97,7 +97,9 @@ impl<'tcx> Checker<'tcx> {
 
 				let checker = FunctionChecker::new(self.tcx, &params, ret);
 
-				if let Err(errors) = checker.check(function) {
+				checker.check_function(function);
+
+				if let Err(errors) = checker.into_result() {
 					for error in errors {
 						self.add_error(error);
 					}

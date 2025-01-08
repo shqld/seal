@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use swc_ecma_ast::{
-	AssignExpr, AssignTarget, BinExpr, BinaryOp, Decl, Expr, Lit, MemberExpr, MemberProp, Pat,
-	Prop, PropOrSpread, SimpleAssignTarget, TsSatisfiesExpr, UnaryOp, VarDeclKind,
+	AssignExpr, AssignTarget, BinExpr, BinaryOp, BlockStmtOrExpr, Decl, Expr, Lit, MemberExpr,
+	MemberProp, Pat, Prop, PropOrSpread, SimpleAssignTarget, TsSatisfiesExpr, UnaryOp, VarDeclKind,
 };
 
-use crate::{Ty, TyKind, symbol::Symbol};
+use crate::{Ty, TyKind, checker::function::FunctionChecker, symbol::Symbol};
 
 use super::BaseChecker;
 
@@ -220,6 +220,59 @@ impl<'tcx> BaseChecker<'tcx> {
 				}
 
 				self.tcx.new_object(fields)
+			}
+			Expr::Arrow(closure) => {
+				let mut params = vec![];
+
+				for param in &closure.params {
+					match param {
+						Pat::Ident(ident) => {
+							let name = Symbol::new(ident.to_id());
+							let ty = self.get_var_ty(&name).unwrap();
+
+							params.push((name, ty));
+						}
+						_ => unimplemented!("{:#?}", param),
+					};
+				}
+
+				match closure.body.as_ref() {
+					BlockStmtOrExpr::Expr(body) => {
+						let ret = self.check_expr(body);
+
+						if let Some(return_type) = &closure.return_type {
+							let expected = self.build_ts_type(&return_type.type_ann);
+
+							if !self.satisfies(expected, ret) {
+								self.raise_type_error(expected, ret);
+							}
+						}
+
+						self.tcx.new_function(params, ret)
+					}
+					BlockStmtOrExpr::BlockStmt(body) => {
+						let ret = match &closure.return_type {
+							Some(type_ann) => self.build_ts_type(&type_ann.type_ann),
+							None => self.constants.void,
+						};
+
+						let checker = FunctionChecker::new(self.tcx, &params, ret);
+
+						for (name, var) in self.vars.borrow().iter() {
+							checker.add_var(name, var.ty, var.is_assignable);
+						}
+
+						checker.check_body(body);
+
+						if let Err(errors) = checker.into_result() {
+							for error in errors {
+								self.add_error(error);
+							}
+						}
+
+						self.tcx.new_function(params, ret)
+					}
+				}
 			}
 			_ => unimplemented!("{:#?}", expr),
 		}
