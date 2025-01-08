@@ -32,8 +32,8 @@ impl<'tcx> TyContext<'tcx> {
 		self.new_ty(TyKind::String(Some(value)))
 	}
 
-	pub fn new_function(&'tcx self, params: Vec<Ty<'tcx>>, ret: Ty<'tcx>) -> Ty<'tcx> {
-		self.new_ty(TyKind::Function(Function { params, ret }))
+	pub fn new_function(&'tcx self, params: Vec<(Symbol, Ty<'tcx>)>, ret: Ty<'tcx>) -> Ty<'tcx> {
+		self.new_ty(TyKind::Function(Function::new(params, ret)))
 	}
 
 	pub fn new_union(&'tcx self, arms: BTreeSet<Ty<'tcx>>) -> Ty<'tcx> {

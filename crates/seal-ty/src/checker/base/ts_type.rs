@@ -5,7 +5,7 @@ use swc_ecma_ast::{
 	TsUnionOrIntersectionType,
 };
 
-use crate::Ty;
+use crate::{Ty, symbol::Symbol};
 
 use super::BaseChecker;
 
@@ -22,20 +22,23 @@ impl<'tcx> BaseChecker<'tcx> {
 			},
 			TsType::TsFnOrConstructorType(fn_or_constructor) => match fn_or_constructor {
 				TsFnOrConstructorType::TsFnType(fn_) => {
-					let ret_ty = self.build_ts_type(&fn_.type_ann.type_ann);
+					let ret = self.build_ts_type(&fn_.type_ann.type_ann);
 
-					let mut param_tys = vec![];
+					let mut params = vec![];
 					for param in &fn_.params {
-						let ty = match param {
+						match param {
 							TsFnParam::Ident(ident) => {
-								self.build_ts_type(&ident.type_ann.as_ref().unwrap().type_ann)
+								let name = Symbol::new(ident.to_id());
+								let ty =
+									self.build_ts_type(&ident.type_ann.as_ref().unwrap().type_ann);
+
+								params.push((name, ty));
 							}
 							_ => unimplemented!("{:#?}", param),
 						};
-						param_tys.push(ty);
 					}
 
-					self.tcx.new_function(param_tys, ret_ty)
+					self.tcx.new_function(params, ret)
 				}
 				_ => unimplemented!(),
 			},

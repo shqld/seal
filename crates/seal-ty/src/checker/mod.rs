@@ -67,8 +67,8 @@ impl<'tcx> Checker<'tcx> {
 				ident, function, ..
 			}) => {
 				let name = Symbol::new(ident.to_id());
-				let mut params = vec![];
 
+				let mut params = vec![];
 				for param in &function.params {
 					match &param.pat {
 						Pat::Ident(ident) => {
@@ -87,7 +87,7 @@ impl<'tcx> Checker<'tcx> {
 					}
 				}
 
-				let ret_ty = match &function.return_type {
+				let ret = match &function.return_type {
 					Some(type_ann) => self.build_ts_type(&type_ann.type_ann),
 					None => {
 						// NOTE: seal does't infer the return type
@@ -95,11 +95,7 @@ impl<'tcx> Checker<'tcx> {
 					}
 				};
 
-				let function_ty = self
-					.tcx
-					.new_function(params.iter().map(|(_, ty)| *ty).collect(), ret_ty);
-
-				let checker = FunctionChecker::new(self.tcx, params, ret_ty);
+				let checker = FunctionChecker::new(self.tcx, &params, ret);
 
 				if let Err(errors) = checker.check(function) {
 					for error in errors {
@@ -107,7 +103,7 @@ impl<'tcx> Checker<'tcx> {
 					}
 				};
 
-				self.add_var(&name, function_ty, false);
+				self.add_var(&name, self.tcx.new_function(params, ret), false);
 			}
 			_ => self.base.check_decl(decl),
 		}

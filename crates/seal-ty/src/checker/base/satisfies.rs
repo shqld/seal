@@ -29,7 +29,7 @@ impl<'tcx> BaseChecker<'tcx> {
 					return false;
 				}
 
-				for (expected, actual) in expected.params.iter().zip(&actual.params) {
+				for ((_, expected), (_, actual)) in expected.params.iter().zip(&actual.params) {
 					if !self.satisfies(*expected, *actual) {
 						return false;
 					}

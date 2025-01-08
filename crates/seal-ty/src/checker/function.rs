@@ -26,18 +26,13 @@ impl<'tcx> Deref for FunctionChecker<'tcx> {
 impl<'tcx> FunctionChecker<'tcx> {
 	pub fn new(
 		tcx: &'tcx TyContext<'tcx>,
-		params: Vec<(Symbol, Ty<'tcx>)>,
+		params: &[(Symbol, Ty<'tcx>)],
 		ret: Ty<'tcx>,
 	) -> FunctionChecker<'tcx> {
 		let base = BaseChecker::new(tcx);
 
-		let mut param_tys = vec![];
-
-		for (name, ty) in &params {
-			let ty = *ty;
-
-			param_tys.push(ty);
-			base.add_var(name, ty, false);
+		for (name, ty) in params {
+			base.add_var(name, *ty, false);
 		}
 
 		let root_scope = base.enter_new_scope();

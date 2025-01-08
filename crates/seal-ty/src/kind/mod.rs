@@ -38,16 +38,15 @@ impl Display for TyKind<'_> {
 				Some(value) => write!(f, "\"{}\"", value),
 				None => write!(f, "string"),
 			},
-			TyKind::Function(Function { params, ret }) => write!(
-				f,
-				"({}) => {}",
-				params
+			TyKind::Function(Function { params, ret }) => {
+				let params = params
 					.iter()
-					.map(|ty| ty.to_string())
+					.map(|(name, ty)| format!("{}: {}", name, ty))
 					.collect::<Vec<_>>()
-					.join(", "),
-				ret
-			),
+					.join(", ");
+
+				write!(f, "({params}) => {ret}")
+			}
 			TyKind::Object(Object { fields }) => write!(
 				f,
 				"{{{}}}",
@@ -75,8 +74,14 @@ impl Display for TyKind<'_> {
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Function<'tcx> {
-	pub params: Vec<Ty<'tcx>>,
+	pub params: Vec<(Symbol, Ty<'tcx>)>,
 	pub ret: Ty<'tcx>,
+}
+
+impl<'tcx> Function<'tcx> {
+	pub fn new(params: Vec<(Symbol, Ty<'tcx>)>, ret: Ty<'tcx>) -> Self {
+		Self { params, ret }
+	}
 }
 
 #[derive(Debug, Hash, PartialEq, Eq)]

@@ -130,7 +130,7 @@ fail!(
         }
         f satisfies (x: number) => string;
     "#,
-	&["expected '(number) => string', got '(number, number) => string'"]
+	&["expected '(x: number) => string', got '(x: number, y: number) => string'"]
 );
 
 fail!(
@@ -141,7 +141,7 @@ fail!(
         }
         f satisfies (x: string) => string;
     "#,
-	&["expected '(string) => string', got '(number) => string'"]
+	&["expected '(x: string) => string', got '(x: number) => string'"]
 );
 
 fail!(
@@ -152,5 +152,5 @@ fail!(
         }
         f satisfies (x: number) => string;
     "#,
-	&["expected '(number) => string', got '(number) => number'"]
+	&["expected '(x: number) => string', got '(x: number) => number'"]
 );
