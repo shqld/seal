@@ -10,30 +10,34 @@ use crate::{Ty, symbol::Symbol};
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub enum TyKind<'tcx> {
+	// value types
+	Void,
 	Boolean,
 	Number,
 	String(Option<Atom>),
-	Err,
-	Function(Function<'tcx>),
-	Void,
-	Union(Union<'tcx>),
-	Never,
 	Object(Object<'tcx>),
-	Guard(Symbol, Ty<'tcx>),
+	Function(Function<'tcx>),
+
+	// special types
+	Union(Union<'tcx>),
+
+	// internal checker types (users cannot create)
+	Err,
 	Lazy,
+	Never,
+	Guard(Symbol, Ty<'tcx>),
 }
 
 impl Display for TyKind<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			TyKind::Boolean | TyKind::Guard(_, _) => write!(f, "boolean"),
+			TyKind::Void => write!(f, "void"),
+			TyKind::Boolean => write!(f, "boolean"),
 			TyKind::Number => write!(f, "number"),
 			TyKind::String(value) => match value {
 				Some(value) => write!(f, "\"{}\"", value),
 				None => write!(f, "string"),
 			},
-			TyKind::Err => write!(f, "<err>"),
-			TyKind::Lazy => write!(f, "<lazy>",),
 			TyKind::Function(Function { params, ret }) => write!(
 				f,
 				"({}) => {}",
@@ -44,16 +48,6 @@ impl Display for TyKind<'_> {
 					.join(", "),
 				ret
 			),
-			TyKind::Void => write!(f, "void"),
-			TyKind::Union(Union { arms: tys }) => write!(
-				f,
-				"{}",
-				tys.iter()
-					.map(|ty| ty.to_string())
-					.collect::<Vec<_>>()
-					.join(" | ")
-			),
-			TyKind::Never => write!(f, "never"),
 			TyKind::Object(Object { fields }) => write!(
 				f,
 				"{{{}}}",
@@ -63,17 +57,19 @@ impl Display for TyKind<'_> {
 					.collect::<Vec<_>>()
 					.join(", ")
 			),
+			TyKind::Union(Union { arms: tys }) => write!(
+				f,
+				"{}",
+				tys.iter()
+					.map(|ty| ty.to_string())
+					.collect::<Vec<_>>()
+					.join(" | ")
+			),
+			TyKind::Err => write!(f, "<err>"),
+			TyKind::Lazy => write!(f, "<lazy>",),
+			TyKind::Never => write!(f, "<never>",),
+			TyKind::Guard(_, _) => write!(f, "<guard>"),
 		}
-	}
-}
-
-impl TyKind<'_> {
-	pub fn is_err(&self) -> bool {
-		matches!(self, TyKind::Err)
-	}
-
-	pub fn is_void(&self) -> bool {
-		matches!(self, TyKind::Void)
 	}
 }
 

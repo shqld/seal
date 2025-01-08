@@ -138,7 +138,9 @@ impl<'tcx> Checker<'tcx> {
 					self.check_stmt(stmt);
 				}
 
-				if !ret_ty.is_void() && !self.get_current_function_has_returned() {
+				if !matches!(ret_ty.kind(), TyKind::Void)
+					&& !self.get_current_function_has_returned()
+				{
 					self.add_error("function does not return".to_string());
 				}
 
@@ -163,7 +165,7 @@ impl<'tcx> Checker<'tcx> {
 					if !self.satisfies(expected, actual) {
 						self.raise_type_error(expected, actual);
 					}
-				} else if !expected.is_void() {
+				} else if !matches!(expected.kind(), TyKind::Void) {
 					self.add_error("expected return value".to_string());
 				}
 
