@@ -1,3 +1,4 @@
+mod decl;
 mod expr;
 mod narrow;
 mod satisfies;
