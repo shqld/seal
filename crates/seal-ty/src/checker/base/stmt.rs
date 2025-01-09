@@ -14,7 +14,7 @@ impl BaseChecker<'_> {
 				self.check_expr(expr);
 			}
 			Stmt::Return(_) => {
-				unreachable!("Return statement should be handled in function context");
+				unreachable!("Return statement must be handled in function context");
 			}
 			Stmt::If(IfStmt {
 				test, cons, alt, ..

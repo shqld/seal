@@ -13,7 +13,7 @@ impl<'tcx> BaseChecker<'tcx> {
 			// anything cannot satisfy never even never itself
 			(Never, _) | (_, Never) => false,
 			// Lazy types must be replaced with their actual types before checking
-			(Lazy, _) | (_, Lazy) => panic!("Lazy types should not be present in satisfies"),
+			(Lazy, _) | (_, Lazy) => panic!("Lazy types must not be present in satisfies"),
 			// any guard can satisfy 'boolean', not vice versa
 			(Boolean, Guard(_, _)) => true,
 

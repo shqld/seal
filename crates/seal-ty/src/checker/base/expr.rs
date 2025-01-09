@@ -53,9 +53,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				}
 			}
 			Decl::Fn(_) => {
-				unreachable!(
-					"Function declaration should be handled in module or function context"
-				);
+				unreachable!("Function declaration must be handled in module or function context");
 			}
 
 			_ => unimplemented!("{:#?}", decl),

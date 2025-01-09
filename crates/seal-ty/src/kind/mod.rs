@@ -103,7 +103,7 @@ impl<'tcx> Union<'tcx> {
 					}
 				}
 				TyKind::Lazy => {
-					unreachable!("Lazy type should be resolved before creating a union");
+					unreachable!("Lazy type must be resolved before creating a union");
 				}
 				_ => {
 					inner.insert(ty);
