@@ -1,6 +1,6 @@
-use swc_ecma_ast::{Decl, Pat, VarDeclKind};
+use swc_ecma_ast::{Decl, FnDecl, Pat, VarDeclKind};
 
-use crate::{TyKind, symbol::Symbol};
+use crate::{TyKind, checker::function::FunctionChecker, symbol::Symbol};
 
 use super::BaseChecker;
 
@@ -47,8 +47,49 @@ impl BaseChecker<'_> {
 					self.add_var(&binding, ty, !is_const);
 				}
 			}
-			Decl::Fn(_) => {
-				unreachable!("Function declaration must be handled in module or function context");
+			Decl::Fn(FnDecl {
+				ident, function, ..
+			}) => {
+				let name = Symbol::new(ident.to_id());
+
+				let mut params = vec![];
+				for param in &function.params {
+					match &param.pat {
+						Pat::Ident(ident) => {
+							let name = Symbol::new(ident.to_id());
+
+							let ty = match &ident.type_ann {
+								Some(type_ann) => self.build_ts_type(&type_ann.type_ann),
+								None => {
+									panic!("Param type annotation is required");
+								}
+							};
+
+							params.push((name, ty));
+						}
+						_ => unimplemented!("{:#?}", param),
+					}
+				}
+
+				let ret = match &function.return_type {
+					Some(type_ann) => self.build_ts_type(&type_ann.type_ann),
+					None => {
+						// NOTE: seal does't infer the return type
+						self.constants.void
+					}
+				};
+
+				let checker = FunctionChecker::new(self.tcx, &params, ret);
+
+				checker.check_function(function);
+
+				if let Err(errors) = checker.into_result() {
+					for error in errors {
+						self.add_error(error);
+					}
+				};
+
+				self.add_var(&name, self.tcx.new_function(params, ret), false);
 			}
 			_ => unimplemented!("{:#?}", decl),
 		}
