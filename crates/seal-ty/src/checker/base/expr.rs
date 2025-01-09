@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use swc_ecma_ast::{
-	AssignExpr, AssignTarget, BinExpr, BinaryOp, BlockStmtOrExpr, Expr, Lit, MemberExpr,
-	MemberProp, Pat, Prop, PropOrSpread, SimpleAssignTarget, TsSatisfiesExpr, UnaryOp,
+	AssignExpr, AssignTarget, BinExpr, BinaryOp, BlockStmtOrExpr, Expr, ExprOrSpread, Lit,
+	MemberExpr, MemberProp, NewExpr, Pat, Prop, PropOrSpread, SimpleAssignTarget, TsSatisfiesExpr,
+	UnaryOp,
 };
 
 use crate::{Ty, TyKind, checker::function::FunctionChecker, symbol::Symbol};
@@ -101,7 +102,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				}
 			}
 			Expr::Member(MemberExpr { obj, prop, .. }) => {
-				let prop = match &prop {
+				let key = match &prop {
 					MemberProp::Ident(ident) => ident.sym.clone(),
 					_ => unimplemented!("{:#?}", prop),
 				};
@@ -109,12 +110,22 @@ impl<'tcx> BaseChecker<'tcx> {
 				let obj_ty = self.check_expr(obj);
 
 				match obj_ty.kind() {
-					TyKind::Object(obj) => match obj.fields().get(&prop) {
+					TyKind::Object(obj) => match obj.fields().get(&key) {
 						Some(ty) => *ty,
 						None => {
 							// TS(2339)
 							self.add_error(format!(
-								"Property '{prop}' does not exist on type '{obj_ty}'",
+								"Property '{key}' does not exist on type '{obj_ty}'",
+							));
+							self.constants.err
+						}
+					},
+					TyKind::Interface(interface) => match interface.fields().get(&key) {
+						Some(ty) => *ty,
+						None => {
+							// TS(2339)
+							self.add_error(format!(
+								"Property '{key}' does not exist on type '{obj_ty}'",
 							));
 							self.constants.err
 						}
@@ -124,7 +135,7 @@ impl<'tcx> BaseChecker<'tcx> {
 
 						for arm in uni.arms() {
 							if let TyKind::Object(obj) = arm.kind() {
-								if let Some(prop) = obj.get_prop(&prop) {
+								if let Some(prop) = obj.get_prop(&key) {
 									prop_arms.insert(prop);
 									continue;
 								}
@@ -132,7 +143,7 @@ impl<'tcx> BaseChecker<'tcx> {
 
 							// TS(2339)
 							self.add_error(format!(
-								"Property '{prop}' does not exist on type '{arm}'",
+								"Property '{key}' does not exist on type '{arm}'",
 							));
 
 							return self.constants.err;
@@ -141,9 +152,10 @@ impl<'tcx> BaseChecker<'tcx> {
 						self.tcx.new_union(prop_arms)
 					}
 					_ => {
+						// TODO: other message? (e.g. "Property access on non-object is not allowed.")
 						// TS(2339)
 						self.add_error(format!(
-							"Property '{prop}' does not exist on type '{obj_ty}'",
+							"Property '{key}' does not exist on type '{obj_ty}'",
 						));
 						self.constants.err
 					}
@@ -196,7 +208,7 @@ impl<'tcx> BaseChecker<'tcx> {
 							}
 						}
 
-						self.tcx.new_function(params, ret)
+						self.tcx.new_function(crate::kind::Function { params, ret })
 					}
 					BlockStmtOrExpr::BlockStmt(body) => {
 						let ret = match &closure.return_type {
@@ -204,13 +216,13 @@ impl<'tcx> BaseChecker<'tcx> {
 							None => self.constants.void,
 						};
 
-						let checker = FunctionChecker::new(self.tcx, &params, ret);
+						let checker = FunctionChecker::new(self.tcx, params, ret);
 
 						for (name, var) in self.vars.borrow().iter() {
 							checker.add_var(name, var.ty, var.is_assignable);
 						}
 
-						checker.check_body(body);
+						let function = checker.check_body(body);
 
 						if let Err(errors) = checker.into_result() {
 							for error in errors {
@@ -218,9 +230,63 @@ impl<'tcx> BaseChecker<'tcx> {
 							}
 						}
 
-						self.tcx.new_function(params, ret)
+						self.tcx.new_function(function)
 					}
 				}
+			}
+			Expr::New(NewExpr { callee, args, .. }) => {
+				let callee = self.check_expr(callee);
+
+				let class = match callee.kind() {
+					TyKind::Class(class) => class,
+					_ => {
+						// TS(2351)
+						self.add_error("This expression is not constructable.".to_owned());
+						return self.constants.err;
+					}
+				};
+
+				let args = match args {
+					Some(args) => args,
+					None => {
+						self.add_error("Arguments must follow after 'new'.".to_owned());
+						return self.constants.err;
+					}
+				};
+
+				if let Some(ctor) = class.ctor() {
+					let params = &ctor.params;
+
+					if params.len() != args.len() {
+						// TS(2554)
+						self.add_error(format!(
+							"Expected {} arguments, but got {}",
+							params.len(),
+							args.len(),
+						));
+						return self.constants.err;
+					}
+
+					let args = args.iter().map(|ExprOrSpread { expr, spread }| {
+						if spread.is_some() {
+							unimplemented!()
+						}
+
+						self.check_expr(expr)
+					});
+
+					for ((_, param), arg) in params.iter().zip(args) {
+						if !self.satisfies(*param, arg) {
+							self.raise_type_error(*param, arg);
+						}
+					}
+				} else if !args.is_empty() {
+					// TS(2554)
+					self.add_error(format!("Expected 0 arguments, but got {}", args.len(),));
+					return self.constants.err;
+				}
+
+				self.tcx.new_interface(class.interface().clone())
 			}
 			_ => unimplemented!("{:#?}", expr),
 		}

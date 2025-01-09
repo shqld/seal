@@ -1,11 +1,14 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	rc::Rc,
+};
 
 use swc_atoms::Atom;
 
 use crate::{
 	Ty, TyKind,
 	intern::interner::Interner,
-	kind::{Function, Object, Union},
+	kind::{Class, Function, Interface, Object, Union},
 	symbol::Symbol,
 };
 
@@ -32,8 +35,16 @@ impl<'tcx> TyContext<'tcx> {
 		self.new_ty(TyKind::String(Some(value)))
 	}
 
-	pub fn new_function(&'tcx self, params: Vec<(Symbol, Ty<'tcx>)>, ret: Ty<'tcx>) -> Ty<'tcx> {
-		self.new_ty(TyKind::Function(Function::new(params, ret)))
+	pub fn new_function(&'tcx self, function: Function<'tcx>) -> Ty<'tcx> {
+		self.new_ty(TyKind::Function(function))
+	}
+
+	pub fn new_class(&'tcx self, class: Class<'tcx>) -> Ty<'tcx> {
+		self.new_ty(TyKind::Class(class))
+	}
+
+	pub fn new_interface(&'tcx self, interface: Rc<Interface<'tcx>>) -> Ty<'tcx> {
+		self.new_ty(TyKind::Interface(interface))
 	}
 
 	pub fn new_union(&'tcx self, arms: BTreeSet<Ty<'tcx>>) -> Ty<'tcx> {

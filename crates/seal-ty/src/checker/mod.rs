@@ -6,6 +6,7 @@ use swc_ecma_ast::{ModuleItem, Program, Stmt};
 use crate::context::TyContext;
 
 mod base;
+mod class;
 mod function;
 mod scope;
 

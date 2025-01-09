@@ -10,6 +10,7 @@ use crate::{Ty, TyKind, context::TyContext, symbol::Symbol};
 #[derive(Debug)]
 pub struct FunctionChecker<'tcx> {
 	base: BaseChecker<'tcx>,
+	params: Vec<(Symbol, Ty<'tcx>)>,
 	ret: Ty<'tcx>,
 	has_returned: Cell<bool>,
 	root_scope: TyScope,
@@ -26,12 +27,12 @@ impl<'tcx> Deref for FunctionChecker<'tcx> {
 impl<'tcx> FunctionChecker<'tcx> {
 	pub fn new(
 		tcx: &'tcx TyContext<'tcx>,
-		params: &[(Symbol, Ty<'tcx>)],
+		params: Vec<(Symbol, Ty<'tcx>)>,
 		ret: Ty<'tcx>,
 	) -> FunctionChecker<'tcx> {
 		let base = BaseChecker::new(tcx);
 
-		for (name, ty) in params {
+		for (name, ty) in &params {
 			base.add_var(name, *ty, false);
 		}
 
@@ -39,6 +40,7 @@ impl<'tcx> FunctionChecker<'tcx> {
 
 		FunctionChecker {
 			base,
+			params,
 			ret,
 			has_returned: Cell::new(false),
 			root_scope,
@@ -49,16 +51,16 @@ impl<'tcx> FunctionChecker<'tcx> {
 		self.base.into_result()
 	}
 
-	pub fn check_function(&self, function: &Function) {
+	pub fn check_function(&self, function: &Function) -> crate::kind::Function<'tcx> {
 		let body = match &function.body {
 			Some(body) => body,
 			None => panic!("Function body is required"),
 		};
 
-		self.check_body(body);
+		self.check_body(body)
 	}
 
-	pub fn check_body(&self, body: &BlockStmt) {
+	pub fn check_body(&self, body: &BlockStmt) -> crate::kind::Function<'tcx> {
 		for stmt in &body.stmts {
 			self.check_stmt(stmt);
 		}
@@ -70,6 +72,12 @@ impl<'tcx> FunctionChecker<'tcx> {
 		assert_eq!(self.root_scope, self.get_current_scope());
 
 		self.leave_current_scope();
+
+		crate::kind::Function::new(
+			// TODO: check_function(self, ..)
+			self.params.clone(),
+			self.ret,
+		)
 	}
 
 	pub fn check_stmt(&self, stmt: &Stmt) {

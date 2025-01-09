@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use swc_ecma_ast::{
-	TsFnOrConstructorType, TsFnParam, TsKeywordTypeKind, TsLit, TsLitType, TsType, TsTypeLit,
-	TsUnionOrIntersectionType,
+	TsEntityName, TsFnOrConstructorType, TsFnParam, TsKeywordTypeKind, TsLit, TsLitType, TsType,
+	TsTypeLit, TsTypeRef, TsUnionOrIntersectionType,
 };
 
-use crate::{Ty, symbol::Symbol};
+use crate::{Ty, TyKind, symbol::Symbol};
 
 use super::BaseChecker;
 
@@ -38,7 +38,7 @@ impl<'tcx> BaseChecker<'tcx> {
 						};
 					}
 
-					self.tcx.new_function(params, ret)
+					self.tcx.new_function(crate::kind::Function { params, ret })
 				}
 				_ => unimplemented!(),
 			},
@@ -69,6 +69,18 @@ impl<'tcx> BaseChecker<'tcx> {
 				}
 
 				self.tcx.new_object(fields)
+			}
+			TsType::TsTypeRef(TsTypeRef { type_name, .. }) => {
+				let name = Symbol::new(match type_name {
+					TsEntityName::Ident(ident) => ident.to_id(),
+					TsEntityName::TsQualifiedName(_) => unimplemented!(),
+				});
+				let ty = self.get_var_ty(&name).unwrap();
+
+				match ty.kind() {
+					TyKind::Class(class) => self.tcx.new_interface(class.interface()),
+					_ => ty,
+				}
 			}
 			_ => unimplemented!("{:#?}", tstype),
 		}

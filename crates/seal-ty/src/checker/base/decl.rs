@@ -1,6 +1,10 @@
-use swc_ecma_ast::{Decl, FnDecl, Pat, VarDeclKind};
+use swc_ecma_ast::{ClassDecl, Decl, FnDecl, Pat, VarDeclKind};
 
-use crate::{TyKind, checker::function::FunctionChecker, symbol::Symbol};
+use crate::{
+	TyKind,
+	checker::{class::ClassChecker, function::FunctionChecker},
+	symbol::Symbol,
+};
 
 use super::BaseChecker;
 
@@ -79,9 +83,8 @@ impl BaseChecker<'_> {
 					}
 				};
 
-				let checker = FunctionChecker::new(self.tcx, &params, ret);
-
-				checker.check_function(function);
+				let checker = FunctionChecker::new(self.tcx, params, ret);
+				let function = checker.check_function(function);
 
 				if let Err(errors) = checker.into_result() {
 					for error in errors {
@@ -89,7 +92,21 @@ impl BaseChecker<'_> {
 					}
 				};
 
-				self.add_var(&name, self.tcx.new_function(params, ret), false);
+				self.add_var(&name, self.tcx.new_function(function), false);
+			}
+			Decl::Class(ClassDecl { ident, class, .. }) => {
+				let name = Symbol::new(ident.to_id());
+
+				let checker = ClassChecker::new(self.tcx, &name);
+				let class = checker.check_class(class);
+
+				if let Err(errors) = checker.into_result() {
+					for error in errors {
+						self.add_error(error);
+					}
+				};
+
+				self.add_var(&name, self.tcx.new_class(class), false);
 			}
 			_ => unimplemented!("{:#?}", decl),
 		}

@@ -2,6 +2,8 @@ use std::{
 	collections::{BTreeMap, BTreeSet},
 	fmt::Display,
 	hash::Hash,
+	ops::Deref,
+	rc::Rc,
 };
 
 use swc_atoms::Atom;
@@ -17,6 +19,8 @@ pub enum TyKind<'tcx> {
 	String(Option<Atom>),
 	Object(Object<'tcx>),
 	Function(Function<'tcx>),
+	Class(Class<'tcx>),
+	Interface(Rc<Interface<'tcx>>),
 
 	// special types
 	Union(Union<'tcx>),
@@ -47,6 +51,8 @@ impl Display for TyKind<'_> {
 
 				write!(f, "({params}) => {ret}")
 			}
+			TyKind::Class(Class { interface, .. }) => write!(f, "Class {}", interface.name),
+			TyKind::Interface(interface) => write!(f, "{}", interface.name()),
 			TyKind::Object(Object { fields }) => write!(
 				f,
 				"{{{}}}",
@@ -133,7 +139,62 @@ impl<'tcx> Object<'tcx> {
 		&self.fields
 	}
 
-	pub fn get_prop(&self, prop: &Atom) -> Option<Ty<'tcx>> {
-		self.fields.get(prop).copied()
+	pub fn get_prop(&self, key: &Atom) -> Option<Ty<'tcx>> {
+		self.fields.get(key).copied()
+	}
+}
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct Class<'tcx> {
+	ctor: Option<Function<'tcx>>,
+	interface: Rc<Interface<'tcx>>,
+}
+
+impl<'tcx> Deref for Class<'tcx> {
+	type Target = Interface<'tcx>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.interface
+	}
+}
+
+impl<'tcx> Class<'tcx> {
+	pub fn new(ctor: Option<Function<'tcx>>, interface: Rc<Interface<'tcx>>) -> Self {
+		Self {
+			ctor,
+			interface: interface.clone(),
+		}
+	}
+
+	pub fn ctor(&self) -> Option<&Function<'tcx>> {
+		self.ctor.as_ref()
+	}
+
+	pub fn interface(&self) -> Rc<Interface<'tcx>> {
+		self.interface.clone()
+	}
+}
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct Interface<'tcx> {
+	name: Symbol,
+	fields: BTreeMap<Atom, Ty<'tcx>>,
+}
+
+impl<'tcx> Interface<'tcx> {
+	pub fn new(name: Symbol, fields: BTreeMap<Atom, Ty<'tcx>>) -> Self {
+		Self { name, fields }
+	}
+
+	pub fn name(&self) -> &Symbol {
+		&self.name
+	}
+
+	pub fn fields(&self) -> &BTreeMap<Atom, Ty<'tcx>> {
+		&self.fields
+	}
+
+	pub fn get_prop(&self, key: &Atom) -> Option<Ty<'tcx>> {
+		self.fields.get(key).copied()
 	}
 }

@@ -449,3 +449,137 @@ fail!(
     "#,
 	&["expected 'void', got 'number'"]
 );
+
+pass!(
+	empty_class_,
+	r#"
+        class A {}
+
+        new A() satisfies A;
+    "#
+);
+
+fail!(
+	empty_class_with_shame_shape_mismatch_,
+	r#"
+        class A {}
+        class B {}
+
+        new A() satisfies B;
+    "#,
+	&["expected 'B', got 'A'"]
+);
+
+pass!(
+	empty_ctor_,
+	r#"
+        class A {
+            constructor() {
+            }
+        }
+
+        new A() satisfies A;
+    "#
+);
+
+pass!(
+	simple_ctor_,
+	r#"
+        class A {
+            constructor(n: number) {
+            }
+        }
+
+        new A(42) satisfies A;
+    "#
+);
+
+fail!(
+	simple_ctor_args_mismatch_,
+	r#"
+        class A {
+            constructor(n: number) {
+            }
+        }
+
+        new A();
+        new A("hello");
+    "#,
+	&[
+		"Expected 1 arguments, but got 0",
+		"expected 'number', got 'string'"
+	]
+);
+
+pass!(
+	prop_,
+	r#"
+        class A {
+            n: number;
+        }
+
+        let a = new A();
+        a satisfies A;
+        a.n satisfies number;
+    "#
+);
+
+pass!(
+	prop_initializer_,
+	r#"
+        class A {
+            n: number = 42;
+        }
+
+        let a = new A();
+        a satisfies A;
+        a.n satisfies number;
+    "#
+);
+
+pass!(
+	prop_initializer_without_type_ann_,
+	r#"
+        class A {
+            n = 42;
+        }
+
+        let a = new A();
+        a satisfies A;
+        a.n satisfies number;
+    "#
+);
+
+fail!(
+	untyped_prop_,
+	r#"
+        class A {
+            n;
+        }
+    "#,
+	&["Type annotation or initializer is required"]
+);
+
+fail!(
+	prop_initializer_mismatch_,
+	r#"
+        class A {
+            n: number = "hello";
+        }
+    "#,
+	&["expected 'number', got 'string'"]
+);
+
+pass!(
+	method_,
+	r#"
+        class A {
+            m(n: number): number {
+                return n;
+            }
+        }
+
+        let a = new A();
+        a.m satisfies (n: number) => number;
+    "#
+);
