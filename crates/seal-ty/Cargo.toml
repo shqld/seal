@@ -1,0 +1,20 @@
+[package]
+name = "seal-ty"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bitflags = "2.4.1"
+indexmap = "2.1"
+typed-arena = "2"
+
+swc_ecma_ast = "5"
+swc_ecma_parser = "6"
+swc_ecma_transforms_base = "6"
+swc_ecma_visit = "5"
+swc_common = "5"
+
+[dev-dependencies]
+insta = "1.34"
