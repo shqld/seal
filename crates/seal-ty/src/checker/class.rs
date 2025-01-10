@@ -49,7 +49,7 @@ impl<'tcx> ClassChecker<'tcx> {
 				ClassMember::ClassProp(prop) => {
 					let key = match &prop.key {
 						PropName::Ident(ident) => ident.sym.clone(),
-						_ => unimplemented!("{:#?}", prop.key),
+						_ => todo!("{:#?}", prop.key),
 					};
 
 					let ty = prop
@@ -78,7 +78,7 @@ impl<'tcx> ClassChecker<'tcx> {
 				ClassMember::Method(method) => {
 					let key = match &method.key {
 						PropName::Ident(ident) => ident.sym.clone(),
-						_ => unimplemented!("{:#?}", method.key),
+						_ => todo!("{:#?}", method.key),
 					};
 
 					let mut params = vec![];
@@ -96,7 +96,7 @@ impl<'tcx> ClassChecker<'tcx> {
 
 								params.push((name, ty));
 							}
-							_ => unimplemented!("{:#?}", param),
+							_ => todo!("{:#?}", param),
 						}
 					}
 
@@ -119,7 +119,7 @@ impl<'tcx> ClassChecker<'tcx> {
 
 					fields.insert(key, self.tcx.new_function(function));
 				}
-				_ => unimplemented!("{:#?}", member),
+				_ => todo!("{:#?}", member),
 			}
 		}
 
@@ -146,9 +146,9 @@ impl<'tcx> ClassChecker<'tcx> {
 
 						params.push((name, ty));
 					}
-					_ => unimplemented!("{:#?}", param),
+					_ => todo!("{:#?}", param),
 				},
-				_ => unimplemented!("{:#?}", param),
+				_ => todo!("{:#?}", param),
 			}
 		}
 
@@ -161,7 +161,7 @@ impl<'tcx> ClassChecker<'tcx> {
 
 		let body = match &consructor.body {
 			Some(body) => body,
-			_ => unimplemented!("Constructor body is required"),
+			_ => panic!("Constructor body is required"),
 		};
 
 		for stmt in &body.stmts {

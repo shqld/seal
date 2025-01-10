@@ -18,7 +18,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				TsKeywordTypeKind::TsBooleanKeyword => self.constants.boolean,
 				TsKeywordTypeKind::TsVoidKeyword => self.constants.void,
 				TsKeywordTypeKind::TsNeverKeyword => self.constants.never,
-				_ => unimplemented!(),
+				_ => todo!("{:#?}", keyword),
 			},
 			TsType::TsFnOrConstructorType(fn_or_constructor) => match fn_or_constructor {
 				TsFnOrConstructorType::TsFnType(fn_) => {
@@ -34,13 +34,13 @@ impl<'tcx> BaseChecker<'tcx> {
 
 								params.push((name, ty));
 							}
-							_ => unimplemented!("{:#?}", param),
+							_ => todo!("{:#?}", param),
 						};
 					}
 
 					self.tcx.new_function(crate::kind::Function { params, ret })
 				}
-				_ => unimplemented!(),
+				_ => todo!("{:#?}", fn_or_constructor),
 			},
 			TsType::TsUnionOrIntersectionType(ty) => match ty {
 				TsUnionOrIntersectionType::TsUnionType(ty) => self.tcx.new_union(
@@ -53,7 +53,7 @@ impl<'tcx> BaseChecker<'tcx> {
 			},
 			TsType::TsLitType(TsLitType { lit, .. }) => match lit {
 				TsLit::Str(str) => self.tcx.new_const_string(str.value.clone()),
-				_ => unimplemented!("{:#?}", lit),
+				_ => todo!("{:#?}", lit),
 			},
 			TsType::TsTypeLit(TsTypeLit { members, .. }) => {
 				let mut fields = BTreeMap::new();
@@ -64,7 +64,7 @@ impl<'tcx> BaseChecker<'tcx> {
 							let ty = self.build_ts_type(&prop.type_ann.as_ref().unwrap().type_ann);
 							fields.insert(name, ty);
 						}
-						_ => unimplemented!("{:#?}", member),
+						_ => todo!("{:#?}", member),
 					}
 				}
 
@@ -82,7 +82,7 @@ impl<'tcx> BaseChecker<'tcx> {
 					_ => ty,
 				}
 			}
-			_ => unimplemented!("{:#?}", tstype),
+			_ => todo!("{:#?}", tstype),
 		}
 	}
 }

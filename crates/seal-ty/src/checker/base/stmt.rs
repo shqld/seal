@@ -82,7 +82,7 @@ impl BaseChecker<'_> {
 					self.check_stmt(stmt);
 				}
 			}
-			_ => unimplemented!("{:#?}", stmt),
+			_ => todo!("{:#?}", stmt),
 		}
 	}
 }

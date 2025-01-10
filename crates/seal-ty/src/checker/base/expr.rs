@@ -17,9 +17,9 @@ impl<'tcx> BaseChecker<'tcx> {
 				let binding = match &left {
 					AssignTarget::Simple(target) => match &target {
 						SimpleAssignTarget::Ident(ident) => ident,
-						_ => unimplemented!("{:#?}", target),
+						_ => todo!("{:#?}", target),
 					},
-					_ => unimplemented!("{:#?}", left),
+					_ => todo!("{:#?}", left),
 				};
 				let binding = Symbol::new(binding.to_id());
 
@@ -57,7 +57,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				Lit::Bool(_) => self.constants.boolean,
 				Lit::Num(_) => self.constants.number,
 				Lit::Str(value) => self.tcx.new_const_string(value.value.clone()),
-				_ => unimplemented!("{:#?}", lit),
+				_ => todo!("{:#?}", lit),
 			},
 			Expr::Ident(ident) => {
 				let name = Symbol::new(ident.to_id());
@@ -74,7 +74,7 @@ impl<'tcx> BaseChecker<'tcx> {
 
 				match unary.op {
 					UnaryOp::TypeOf => self.constants.type_of,
-					_ => unimplemented!("{:#?}", unary),
+					_ => todo!("{:#?}", unary),
 				}
 			}
 			Expr::Bin(BinExpr {
@@ -98,13 +98,13 @@ impl<'tcx> BaseChecker<'tcx> {
 
 						self.constants.boolean
 					}
-					_ => unimplemented!("{:#?}", op),
+					_ => todo!("{:#?}", op),
 				}
 			}
 			Expr::Member(MemberExpr { obj, prop, .. }) => {
 				let key = match &prop {
 					MemberProp::Ident(ident) => ident.sym.clone(),
-					_ => unimplemented!("{:#?}", prop),
+					_ => todo!("{:#?}", prop),
 				};
 
 				let obj_ty = self.check_expr(obj);
@@ -173,9 +173,9 @@ impl<'tcx> BaseChecker<'tcx> {
 
 								fields.insert(key, ty);
 							}
-							_ => unimplemented!("{:#?}", prop),
+							_ => todo!("{:#?}", prop),
 						},
-						_ => unimplemented!("{:#?}", prop),
+						_ => todo!("{:#?}", prop),
 					}
 				}
 
@@ -192,7 +192,7 @@ impl<'tcx> BaseChecker<'tcx> {
 
 							params.push((name, ty));
 						}
-						_ => unimplemented!("{:#?}", param),
+						_ => todo!("{:#?}", param),
 					};
 				}
 
@@ -269,7 +269,7 @@ impl<'tcx> BaseChecker<'tcx> {
 
 					let args = args.iter().map(|ExprOrSpread { expr, spread }| {
 						if spread.is_some() {
-							unimplemented!()
+							todo!()
 						}
 
 						self.check_expr(expr)
@@ -288,7 +288,7 @@ impl<'tcx> BaseChecker<'tcx> {
 
 				self.tcx.new_interface(class.interface().clone())
 			}
-			_ => unimplemented!("{:#?}", expr),
+			_ => todo!("{:#?}", expr),
 		}
 	}
 }

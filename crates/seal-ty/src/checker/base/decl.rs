@@ -21,7 +21,7 @@ impl BaseChecker<'_> {
 				for var_declarator in &var.decls {
 					let binding = match &var_declarator.name {
 						Pat::Ident(ident) => ident,
-						_ => unimplemented!("{:#?}", var_declarator.name),
+						_ => todo!("{:#?}", var_declarator.name),
 					};
 					let ty = binding
 						.type_ann
@@ -71,7 +71,7 @@ impl BaseChecker<'_> {
 
 							params.push((name, ty));
 						}
-						_ => unimplemented!("{:#?}", param),
+						_ => todo!("{:#?}", param),
 					}
 				}
 
@@ -108,7 +108,7 @@ impl BaseChecker<'_> {
 
 				self.add_var(&name, self.tcx.new_class(class), false);
 			}
-			_ => unimplemented!("{:#?}", decl),
+			_ => todo!("{:#?}", decl),
 		}
 	}
 }

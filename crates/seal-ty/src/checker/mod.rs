@@ -41,7 +41,7 @@ impl<'tcx> Checker<'tcx> {
 				for module_item in &module.body {
 					match module_item {
 						ModuleItem::Stmt(stmt) => self.check_stmt(stmt),
-						_ => unimplemented!("{:#?}", module_item),
+						_ => todo!("{:#?}", module_item),
 					}
 				}
 			}
