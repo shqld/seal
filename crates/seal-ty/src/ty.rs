@@ -30,9 +30,4 @@ impl<'tcx> Ty<'tcx> {
 	pub fn kind(&self) -> &TyKind<'tcx> {
 		&self.0
 	}
-
-	pub fn update(&mut self, ty: Ty<'tcx>) -> Self {
-		self.0 = ty.0;
-		*self
-	}
 }
