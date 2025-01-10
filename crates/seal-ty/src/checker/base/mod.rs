@@ -8,12 +8,15 @@ mod ts_type;
 use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
-	Ty, TyKind,
+	Ty,
 	context::{TyConstants, TyContext},
 	symbol::Symbol,
 };
 
-use super::scope::{ScopeStack, TyScope};
+use super::{
+	errors::{Error, ErrorKind},
+	scope::{ScopeStack, TyScope},
+};
 
 #[derive(Debug)]
 struct Var<'tcx> {
@@ -27,7 +30,7 @@ pub struct BaseChecker<'tcx> {
 	pub tcx: &'tcx TyContext<'tcx>,
 	pub constants: TyConstants<'tcx>,
 	vars: RefCell<HashMap<Symbol, Var<'tcx>>>,
-	errors: RefCell<Vec<String>>,
+	errors: RefCell<Vec<Error<'tcx>>>,
 	scopes: RefCell<ScopeStack>,
 }
 
@@ -44,7 +47,11 @@ impl<'tcx> BaseChecker<'tcx> {
 		}
 	}
 
-	pub fn into_result(self) -> Result<(), Vec<String>> {
+	pub fn add_error(&self, err: ErrorKind<'tcx>) {
+		self.errors.borrow_mut().push(Error::new(err));
+	}
+
+	pub fn into_result(self) -> Result<(), Vec<Error<'tcx>>> {
 		let errors = self.errors.into_inner();
 
 		if errors.is_empty() {
@@ -95,20 +102,8 @@ impl<'tcx> BaseChecker<'tcx> {
 		}
 	}
 
-	pub fn add_error(&self, error: String) {
-		self.errors.borrow_mut().push(error);
-	}
-
+	// TODO: remove
 	pub fn raise_type_error(&self, expected: Ty<'tcx>, actual: Ty<'tcx>) {
-		use TyKind::*;
-
-		if matches!(actual.kind(), String(Some(_))) && !matches!(expected.kind(), String(_)) {
-			self.add_error(format!(
-				"expected '{expected}', got '{}'",
-				TyKind::String(None)
-			));
-		} else {
-			self.add_error(format!("expected '{expected}', got '{actual}'"));
-		}
+		self.add_error(ErrorKind::NotAssignable(expected, actual));
 	}
 }

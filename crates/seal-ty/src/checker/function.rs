@@ -2,9 +2,10 @@ use std::{cell::Cell, ops::Deref};
 
 use swc_ecma_ast::{BlockStmt, Function, ReturnStmt, Stmt};
 
-use super::base::BaseChecker;
 use super::scope::TyScope;
+use super::{base::BaseChecker, errors::Error};
 
+use crate::checker::errors::ErrorKind;
 use crate::{Ty, TyKind, context::TyContext, symbol::Symbol};
 
 #[derive(Debug)]
@@ -47,14 +48,21 @@ impl<'tcx> FunctionChecker<'tcx> {
 		}
 	}
 
-	pub fn into_result(self) -> Result<(), Vec<String>> {
+	pub fn into_result(self) -> Result<(), Vec<Error<'tcx>>> {
 		self.base.into_result()
 	}
 
 	pub fn check_function(&self, function: &Function) -> crate::kind::Function<'tcx> {
 		let body = match &function.body {
 			Some(body) => body,
-			None => panic!("Function body is required"),
+			None => {
+				self.add_error(ErrorKind::MissingBody);
+				return crate::kind::Function::new(
+					// TODO: check_function(self, ..)
+					self.params.clone(),
+					self.ret,
+				);
+			}
 		};
 
 		self.check_body(body)
@@ -66,7 +74,7 @@ impl<'tcx> FunctionChecker<'tcx> {
 		}
 
 		if !matches!(self.ret.kind(), TyKind::Void) && !self.has_returned.get() {
-			self.add_error("function does not return".to_string());
+			self.add_error(ErrorKind::UnexpectedVoid);
 		}
 
 		assert_eq!(self.root_scope, self.get_current_scope());
@@ -92,7 +100,7 @@ impl<'tcx> FunctionChecker<'tcx> {
 						self.raise_type_error(expected, actual);
 					}
 				} else if !matches!(expected.kind(), TyKind::Void) {
-					self.add_error("expected return value".to_string());
+					self.add_error(ErrorKind::UnexpectedVoid);
 				}
 
 				self.has_returned.set(true);

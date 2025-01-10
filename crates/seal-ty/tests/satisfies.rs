@@ -7,7 +7,9 @@ fn run(code: &'static str) -> Result<(), Vec<String>> {
 	let tcx = TyContext::new();
 	let checker = Checker::new(&tcx);
 
-	checker.check(&ast)
+	checker
+		.check(&ast)
+		.map_err(|errors| errors.into_iter().map(|e| format!("{}", e)).collect())
 }
 
 macro_rules! pass {
@@ -67,7 +69,7 @@ fail!(
         let x: boolean | number | string = 42;
         x satisfies number | string;
     "#,
-	&["expected 'number | string', got 'boolean | number | string'"]
+	&["Type 'boolean | number | string' is not assignable to type 'number | string'."]
 );
 
 pass!(
@@ -92,7 +94,7 @@ fail!(
         let x: "hello" = "hello";
         "hello" satisfies "world";
     "#,
-	&["expected '\"world\"', got '\"hello\"'"]
+	&["Type '\"hello\"' is not assignable to type '\"world\"'."]
 );
 
 pass!(
@@ -109,7 +111,7 @@ fail!(
         let x: string = "hello";
         x satisfies "hello";
     "#,
-	&["expected '\"hello\"', got 'string'"]
+	&["Type 'string' is not assignable to type '\"hello\"'."]
 );
 
 pass!(
@@ -130,7 +132,7 @@ fail!(
         }
         f satisfies (x: number) => string;
     "#,
-	&["expected '(x: number) => string', got '(x: number, y: number) => string'"]
+	&["Type '(x: number, y: number) => string' is not assignable to type '(x: number) => string'."]
 );
 
 fail!(
@@ -141,7 +143,7 @@ fail!(
         }
         f satisfies (x: string) => string;
     "#,
-	&["expected '(x: string) => string', got '(x: number) => string'"]
+	&["Type '(x: number) => string' is not assignable to type '(x: string) => string'."]
 );
 
 fail!(
@@ -152,5 +154,5 @@ fail!(
         }
         f satisfies (x: number) => string;
     "#,
-	&["expected '(x: number) => string', got '(x: number) => number'"]
+	&["Type '(x: number) => number' is not assignable to type '(x: number) => string'."]
 );

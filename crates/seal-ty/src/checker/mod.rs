@@ -1,12 +1,14 @@
 use std::ops::Deref;
 
 use base::BaseChecker;
+use errors::{Error, ErrorKind};
 use swc_ecma_ast::{ModuleItem, Program, Stmt};
 
 use crate::context::TyContext;
 
 mod base;
 mod class;
+pub mod errors;
 mod function;
 mod scope;
 
@@ -30,7 +32,7 @@ impl<'tcx> Checker<'tcx> {
 		}
 	}
 
-	pub fn check(self, ast: &Program) -> Result<(), Vec<String>> {
+	pub fn check(self, ast: &Program) -> Result<(), Vec<Error<'tcx>>> {
 		match &ast {
 			Program::Script(script) => {
 				for stmt in &script.body {
@@ -53,8 +55,7 @@ impl<'tcx> Checker<'tcx> {
 	pub fn check_stmt(&self, stmt: &Stmt) {
 		match stmt {
 			Stmt::Return(_) => {
-				// TS(1108)
-				panic!("Return statement is not allowed in the main function");
+				self.add_error(ErrorKind::UnexpectedReturn);
 			}
 			_ => self.base.check_stmt(stmt),
 		}

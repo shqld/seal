@@ -7,7 +7,9 @@ fn run(code: &'static str) -> Result<(), Vec<String>> {
 	let tcx = TyContext::new();
 	let checker = Checker::new(&tcx);
 
-	checker.check(&ast)
+	checker
+		.check(&ast)
+		.map_err(|errors| errors.into_iter().map(|e| format!("{}", e)).collect())
 }
 
 macro_rules! pass {
@@ -60,7 +62,7 @@ fail!(
         let a = 1;
         a = "hello";
     "#,
-	&["expected 'number', got 'string'"]
+	&["Type 'string' is not assignable to type 'number'."]
 );
 
 fail!(
@@ -70,7 +72,7 @@ fail!(
         a = 1;
         a = "hello";
     "#,
-	&["expected 'number', got 'string'"]
+	&["Type 'string' is not assignable to type 'number'."]
 );
 
 pass!(
@@ -131,7 +133,7 @@ fail!(
         function f(n: number): number {
         }
     "#,
-	&["function does not return"]
+	&["A function whose declared type is 'void' must return a value."]
 );
 
 fail!(
@@ -141,7 +143,7 @@ fail!(
             return;
         }
     "#,
-	&["expected return value"]
+	&["A function whose declared type is 'void' must return a value."]
 );
 
 pass!(
@@ -172,7 +174,7 @@ fail!(
             return 42;
         }
     "#,
-	&["expected 'void', got 'number'"]
+	&["Type 'number' is not assignable to type 'void'."]
 );
 
 pass!(
@@ -191,7 +193,7 @@ fail!(
         let n: number;
         n = "hello";
     "#,
-	&["expected 'number', got 'string'"]
+	&["Type 'string' is not assignable to type 'number'."]
 );
 
 pass!(
@@ -248,7 +250,7 @@ fail!(
         // x: number | string
         x satisfies number;
     "#,
-	&["expected 'number', got 'number | string'"]
+	&["Type 'number | string' is not assignable to type 'number'."]
 );
 
 pass!(
@@ -282,7 +284,7 @@ fail!(
 	r#"
         let x: { n: number } = 42;
     "#,
-	&["expected '{n: number}', got 'number'"]
+	&["Type 'number' is not assignable to type '{n: number}'."]
 );
 
 fail!(
@@ -290,7 +292,7 @@ fail!(
 	r#"
         let x: { n: number } = { n: 'hello' };
     "#,
-	&["expected '{n: number}', got '{n: \"hello\"}'"]
+	&["Type '{n: \"hello\"}' is not assignable to type '{n: number}'."]
 );
 
 pass!(
@@ -344,7 +346,7 @@ fail!(
         let x: number = 42;
         x.t;
     "#,
-	&["Property 't' does not exist on type 'number'",]
+	&["Property 't' does not exist on type 'number'."]
 );
 
 fail!(
@@ -353,7 +355,7 @@ fail!(
         let x: { n: number } = { n: 42 };
         x.t;
     "#,
-	&["Property 't' does not exist on type '{n: number}'"]
+	&["Property 't' does not exist on type '{n: number}'."]
 );
 
 fail!(
@@ -362,7 +364,7 @@ fail!(
         let x: number | { n: number } = 42;
         x.n;
     "#,
-	&["Property 'n' does not exist on type 'number'"]
+	&["Property 'n' does not exist on type 'number'."]
 );
 
 fail!(
@@ -372,7 +374,7 @@ fail!(
         x.n === "hello";
     "#,
 	&[
-		"This comparison appears to be unintentional because the types 'number' and '\"hello\"' have no overlap"
+		"This comparison appears to be unintentional because the types 'number' and '\"hello\"' have no overlap."
 	]
 );
 
@@ -402,7 +404,7 @@ fail!(
         let x = 42;
         let f = (): string => x;
     "#,
-	&["expected 'string', got 'number'"]
+	&["Type 'number' is not assignable to type 'string'."]
 );
 
 pass!(
@@ -435,7 +437,7 @@ fail!(
             return x;
         };
     "#,
-	&["expected 'void', got 'number'"]
+	&["Type 'number' is not assignable to type 'void'."]
 );
 
 fail!(
@@ -447,7 +449,7 @@ fail!(
             return x;
         };
     "#,
-	&["expected 'void', got 'number'"]
+	&["Type 'number' is not assignable to type 'void'."]
 );
 
 pass!(
@@ -467,7 +469,7 @@ fail!(
 
         new A() satisfies B;
     "#,
-	&["expected 'B', got 'A'"]
+	&["Type 'A' is not assignable to type 'B'."]
 );
 
 pass!(
@@ -506,8 +508,8 @@ fail!(
         new A("hello");
     "#,
 	&[
-		"Expected 1 arguments, but got 0",
-		"expected 'number', got 'string'"
+		"Expected 1 arguments, but got 0.",
+		"Type 'string' is not assignable to type 'number'."
 	]
 );
 
@@ -557,7 +559,7 @@ fail!(
             n;
         }
     "#,
-	&["Type annotation or initializer is required"]
+	&["Type annotation or initializer is required."]
 );
 
 fail!(
@@ -567,7 +569,7 @@ fail!(
             n: number = "hello";
         }
     "#,
-	&["expected 'number', got 'string'"]
+	&["Type 'string' is not assignable to type 'number'."]
 );
 
 pass!(

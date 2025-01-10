@@ -2,7 +2,7 @@ use swc_ecma_ast::{ClassDecl, Decl, FnDecl, Pat, VarDeclKind};
 
 use crate::{
 	TyKind,
-	checker::{class::ClassChecker, function::FunctionChecker},
+	checker::{class::ClassChecker, errors::ErrorKind, function::FunctionChecker},
 	symbol::Symbol,
 };
 
@@ -13,7 +13,13 @@ impl BaseChecker<'_> {
 		match decl {
 			Decl::Var(var) => {
 				let is_const = match var.kind {
-					VarDeclKind::Var => panic!("Var is not supported"),
+					VarDeclKind::Var => {
+						self.add_error(ErrorKind::Var);
+
+						// NOTE: 'var' is not allowed, but check the following declarators
+						//       to provide feedbacks on where the variable is referenced
+						true
+					}
 					VarDeclKind::Const => true,
 					VarDeclKind::Let => false,
 				};
@@ -23,13 +29,24 @@ impl BaseChecker<'_> {
 						Pat::Ident(ident) => ident,
 						_ => todo!("{:#?}", var_declarator.name),
 					};
+
+					let name = Symbol::new(binding.to_id());
+
+					if let VarDeclKind::Var = var.kind {
+						self.add_var(
+							&name,
+							// NOTE: to make every reference to the 'var' variable an error, set this type to never
+							self.constants.never,
+							false,
+						);
+						continue;
+					}
+
 					let ty = binding
 						.type_ann
 						.as_ref()
 						.map(|type_ann| self.build_ts_type(&type_ann.type_ann))
 						.unwrap_or_else(|| self.constants.lazy);
-
-					let binding = Symbol::new(binding.to_id());
 
 					if let Some(init) = &var_declarator.init {
 						let expected = ty;
@@ -37,7 +54,7 @@ impl BaseChecker<'_> {
 
 						// if no type is specified to the declaration, replace with actual type
 						if let TyKind::Lazy = ty.kind() {
-							self.add_var(&binding, actual, !is_const);
+							self.add_var(&name, actual, !is_const);
 							return;
 						}
 
@@ -45,10 +62,10 @@ impl BaseChecker<'_> {
 							self.raise_type_error(expected, actual);
 						}
 					} else if is_const {
-						panic!("Const variable must be initialized");
+						self.add_error(ErrorKind::ConstMissingInit);
 					};
 
-					self.add_var(&binding, ty, !is_const);
+					self.add_var(&name, ty, !is_const);
 				}
 			}
 			Decl::Fn(FnDecl {
@@ -65,7 +82,8 @@ impl BaseChecker<'_> {
 							let ty = match &ident.type_ann {
 								Some(type_ann) => self.build_ts_type(&type_ann.type_ann),
 								None => {
-									panic!("Param type annotation is required");
+									self.add_error(ErrorKind::ParamMissingTypeAnn);
+									self.constants.err
 								}
 							};
 
@@ -88,7 +106,7 @@ impl BaseChecker<'_> {
 
 				if let Err(errors) = checker.into_result() {
 					for error in errors {
-						self.add_error(error);
+						self.add_error(error.kind);
 					}
 				};
 
@@ -102,7 +120,7 @@ impl BaseChecker<'_> {
 
 				if let Err(errors) = checker.into_result() {
 					for error in errors {
-						self.add_error(error);
+						self.add_error(error.kind);
 					}
 				};
 

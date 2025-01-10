@@ -6,7 +6,11 @@ use swc_ecma_ast::{
 	UnaryOp,
 };
 
-use crate::{Ty, TyKind, checker::function::FunctionChecker, symbol::Symbol};
+use crate::{
+	Ty, TyKind,
+	checker::{errors::ErrorKind, function::FunctionChecker},
+	symbol::Symbol,
+};
 
 use super::BaseChecker;
 
@@ -21,18 +25,18 @@ impl<'tcx> BaseChecker<'tcx> {
 					},
 					_ => todo!("{:#?}", left),
 				};
-				let binding = Symbol::new(binding.to_id());
+				let name = Symbol::new(binding.to_id());
 
-				if !self.get_var_is_assignable(&binding).unwrap() {
-					panic!("Cannot assign to immutable variable");
+				if !self.get_var_is_assignable(&name).unwrap() {
+					self.add_error(ErrorKind::CannotAssignToConst(name.clone()));
 				}
 
-				let expected = self.get_var_ty(&binding).unwrap();
+				let expected = self.get_var_ty(&name).unwrap();
 				let actual = self.check_expr(right);
 
 				// if no type is specified to the declaration, replace with actual type
 				if let TyKind::Lazy = expected.kind() {
-					self.add_var(&binding, actual, true);
+					self.add_var(&name, actual, true);
 					return actual;
 				}
 
@@ -65,7 +69,8 @@ impl<'tcx> BaseChecker<'tcx> {
 				if let Some(ty) = self.get_var_ty(&name) {
 					ty
 				} else {
-					panic!("Type not found: {:?}", name);
+					self.add_error(ErrorKind::CannotFindName(name));
+					self.constants.err
 				}
 			}
 
@@ -86,8 +91,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				match op {
 					BinaryOp::EqEqEq => {
 						if !self.overlaps(left_ty, right_ty) {
-							// TS(2367)
-							self.add_error(format!("This comparison appears to be unintentional because the types '{left_ty}' and '{right_ty}' have no overlap"));
+							self.add_error(ErrorKind::NoOverlap(left_ty, right_ty));
 
 							return self.constants.err;
 						}
@@ -113,20 +117,14 @@ impl<'tcx> BaseChecker<'tcx> {
 					TyKind::Object(obj) => match obj.fields().get(&key) {
 						Some(ty) => *ty,
 						None => {
-							// TS(2339)
-							self.add_error(format!(
-								"Property '{key}' does not exist on type '{obj_ty}'",
-							));
+							self.add_error(ErrorKind::PropertyDoesNotExist(obj_ty, key));
 							self.constants.err
 						}
 					},
 					TyKind::Interface(interface) => match interface.fields().get(&key) {
 						Some(ty) => *ty,
 						None => {
-							// TS(2339)
-							self.add_error(format!(
-								"Property '{key}' does not exist on type '{obj_ty}'",
-							));
+							self.add_error(ErrorKind::PropertyDoesNotExist(obj_ty, key));
 							self.constants.err
 						}
 					},
@@ -141,10 +139,7 @@ impl<'tcx> BaseChecker<'tcx> {
 								}
 							}
 
-							// TS(2339)
-							self.add_error(format!(
-								"Property '{key}' does not exist on type '{arm}'",
-							));
+							self.add_error(ErrorKind::PropertyDoesNotExist(*arm, key));
 
 							return self.constants.err;
 						}
@@ -152,11 +147,8 @@ impl<'tcx> BaseChecker<'tcx> {
 						self.tcx.new_union(prop_arms)
 					}
 					_ => {
-						// TODO: other message? (e.g. "Property access on non-object is not allowed.")
-						// TS(2339)
-						self.add_error(format!(
-							"Property '{key}' does not exist on type '{obj_ty}'",
-						));
+						// TODO: other error kind? (e.g. "Property access on non-object is not allowed.")
+						self.add_error(ErrorKind::PropertyDoesNotExist(obj_ty, key));
 						self.constants.err
 					}
 				}
@@ -226,7 +218,7 @@ impl<'tcx> BaseChecker<'tcx> {
 
 						if let Err(errors) = checker.into_result() {
 							for error in errors {
-								self.add_error(error);
+								self.add_error(error.kind);
 							}
 						}
 
@@ -240,8 +232,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				let class = match callee.kind() {
 					TyKind::Class(class) => class,
 					_ => {
-						// TS(2351)
-						self.add_error("This expression is not constructable.".to_owned());
+						self.add_error(ErrorKind::NotConstructable);
 						return self.constants.err;
 					}
 				};
@@ -249,7 +240,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				let args = match args {
 					Some(args) => args,
 					None => {
-						self.add_error("Arguments must follow after 'new'.".to_owned());
+						self.add_error(ErrorKind::NewOpMissingArgs);
 						return self.constants.err;
 					}
 				};
@@ -258,12 +249,7 @@ impl<'tcx> BaseChecker<'tcx> {
 					let params = &ctor.params;
 
 					if params.len() != args.len() {
-						// TS(2554)
-						self.add_error(format!(
-							"Expected {} arguments, but got {}",
-							params.len(),
-							args.len(),
-						));
+						self.add_error(ErrorKind::WrongNumArgs(params.len(), args.len()));
 						return self.constants.err;
 					}
 
@@ -282,7 +268,7 @@ impl<'tcx> BaseChecker<'tcx> {
 					}
 				} else if !args.is_empty() {
 					// TS(2554)
-					self.add_error(format!("Expected 0 arguments, but got {}", args.len(),));
+					self.add_error(ErrorKind::WrongNumArgs(0, args.len()));
 					return self.constants.err;
 				}
 

@@ -4,6 +4,7 @@ use std::{collections::BTreeMap, ops::Deref};
 use swc_ecma_ast::{Class, ClassMember, Constructor, ParamOrTsParamProp, Pat, PropName, Stmt};
 
 use super::base::BaseChecker;
+use super::errors::{Error, ErrorKind};
 use super::function::FunctionChecker;
 
 use crate::{context::TyContext, symbol::Symbol};
@@ -33,7 +34,7 @@ impl<'tcx> ClassChecker<'tcx> {
 		}
 	}
 
-	pub fn into_result(self) -> Result<(), Vec<String>> {
+	pub fn into_result(self) -> Result<(), Vec<Error<'tcx>>> {
 		self.base.into_result()
 	}
 
@@ -68,7 +69,7 @@ impl<'tcx> ClassChecker<'tcx> {
 						(Some(ty), None) => ty,
 						(None, Some(init)) => init,
 						(None, None) => {
-							self.add_error("Type annotation or initializer is required".to_owned());
+							self.add_error(ErrorKind::ClassPropMissingTypeAnnOrInit);
 							self.constants.err
 						}
 					};
@@ -90,7 +91,8 @@ impl<'tcx> ClassChecker<'tcx> {
 								let ty = match &ident.type_ann {
 									Some(type_ann) => self.build_ts_type(&type_ann.type_ann),
 									None => {
-										panic!("Param type annotation is required");
+										self.add_error(ErrorKind::ParamMissingTypeAnn);
+										self.constants.err
 									}
 								};
 
@@ -113,7 +115,7 @@ impl<'tcx> ClassChecker<'tcx> {
 
 					if let Err(errors) = checker.into_result() {
 						for error in errors {
-							self.add_error(error);
+							self.add_error(error.kind);
 						}
 					};
 
@@ -140,7 +142,8 @@ impl<'tcx> ClassChecker<'tcx> {
 						let ty = match &ident.type_ann {
 							Some(type_ann) => self.build_ts_type(&type_ann.type_ann),
 							None => {
-								panic!("Param type annotation is required");
+								self.add_error(ErrorKind::ParamMissingTypeAnn);
+								self.constants.err
 							}
 						};
 
@@ -161,13 +164,16 @@ impl<'tcx> ClassChecker<'tcx> {
 
 		let body = match &consructor.body {
 			Some(body) => body,
-			_ => panic!("Constructor body is required"),
+			_ => {
+				self.add_error(ErrorKind::MissingBody);
+				return crate::kind::Function::new(params, self.constants.void);
+			}
 		};
 
 		for stmt in &body.stmts {
 			match stmt {
 				Stmt::Return(_) => {
-					checker.add_error("Constructor cannot have return statement".to_owned());
+					checker.add_error(ErrorKind::ClassCtorWithReturn);
 				}
 				_ => checker.check_stmt(stmt),
 			}
@@ -175,7 +181,7 @@ impl<'tcx> ClassChecker<'tcx> {
 
 		if let Err(errors) = checker.into_result() {
 			for error in errors {
-				self.add_error(error);
+				self.add_error(error.kind);
 			}
 		};
 
