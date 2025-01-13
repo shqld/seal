@@ -49,6 +49,9 @@ pub enum ErrorKind<'tcx> {
 	CannotAssignToConst(Symbol),
 	/// TS(2355)
 	UnexpectedVoid,
+	// TS(2349)
+	NotCallable(Ty<'tcx>),
+
 	/// TS(2367)
 	NoOverlap(Ty<'tcx>, Ty<'tcx>),
 }
@@ -126,6 +129,12 @@ impl Display for ErrorKind<'_> {
 			}
 			CannotAssignToConst(name) => {
 				write!(f, "Cannot assign to '{}' because it is a constant.", name)
+			}
+			NotCallable(ty) => {
+				write!(
+					f,
+					"This expression is not callable.\nType '{ty}' has no call signatures.",
+				)
 			}
 		}
 	}

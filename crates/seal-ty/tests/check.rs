@@ -585,3 +585,38 @@ pass!(
         a.m satisfies (n: number) => number;
     "#
 );
+pass!(
+	function_call_,
+	r#"
+        function f(): number {
+            return 42;
+        }
+
+        f satisfies () => number;
+        f(42) satisfies number;
+    "#
+);
+
+fail!(
+	function_call_non_callable_value,
+	r#"
+        let n = 42;
+
+        n satisfies number;
+        n(42) satisfies number;
+    "#,
+	&["This expression is not callable.\nType 'number' has no call signatures."]
+);
+
+fail!(
+	function_call_args_mismatch_,
+	r#"
+        function f(n: number): number {
+            return n;
+        }
+
+        f satisfies (n: number) => number;
+        f("hello");
+    "#,
+	&["Type 'string' is not assignable to type 'number'."]
+);

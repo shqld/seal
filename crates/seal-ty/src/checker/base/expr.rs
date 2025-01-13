@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use swc_ecma_ast::{
-	AssignExpr, AssignTarget, BinExpr, BinaryOp, BlockStmtOrExpr, Expr, ExprOrSpread, Lit,
-	MemberExpr, MemberProp, NewExpr, Pat, Prop, PropOrSpread, SimpleAssignTarget, TsSatisfiesExpr,
-	UnaryOp,
+	AssignExpr, AssignTarget, BinExpr, BinaryOp, BlockStmtOrExpr, CallExpr, Callee, Expr,
+	ExprOrSpread, Lit, MemberExpr, MemberProp, NewExpr, Pat, Prop, PropOrSpread,
+	SimpleAssignTarget, TsSatisfiesExpr, UnaryOp,
 };
 
 use crate::{
@@ -273,6 +273,36 @@ impl<'tcx> BaseChecker<'tcx> {
 				}
 
 				self.tcx.new_interface(class.interface().clone())
+			}
+			Expr::Call(CallExpr { callee, args, .. }) => {
+				let callee = self.check_expr(match callee {
+					Callee::Expr(expr) => expr,
+					_ => todo!("{:#?}", callee),
+				});
+
+				let function = match callee.kind() {
+					TyKind::Function(function) => function,
+					_ => {
+						self.add_error(ErrorKind::NotCallable(callee));
+						return self.constants.err;
+					}
+				};
+
+				let args = args.iter().map(|ExprOrSpread { expr, spread }| {
+					if spread.is_some() {
+						todo!()
+					}
+
+					self.check_expr(expr)
+				});
+
+				for ((_, param), arg) in function.params.iter().zip(args) {
+					if !self.satisfies(*param, arg) {
+						self.raise_type_error(*param, arg);
+					}
+				}
+
+				function.ret
 			}
 			_ => todo!("{:#?}", expr),
 		}
