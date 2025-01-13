@@ -5,7 +5,7 @@ mod satisfies;
 mod stmt;
 mod ts_type;
 
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, ops::Deref};
 
 use crate::{
 	Ty,
@@ -13,16 +13,12 @@ use crate::{
 	symbol::Symbol,
 };
 
-use super::{
-	errors::{Error, ErrorKind},
-	scope::{ScopeStack, TyScope},
-};
+use super::errors::{Error, ErrorKind};
 
 #[derive(Debug)]
 struct Var<'tcx> {
 	ty: Ty<'tcx>,
 	is_assignable: bool,
-	scoped_tys: HashMap<TyScope, Ty<'tcx>>,
 }
 
 #[derive(Debug)]
@@ -31,7 +27,6 @@ pub struct BaseChecker<'tcx> {
 	pub constants: TyConstants<'tcx>,
 	vars: RefCell<HashMap<Symbol, Var<'tcx>>>,
 	errors: RefCell<Vec<Error<'tcx>>>,
-	scopes: RefCell<ScopeStack>,
 }
 
 impl<'tcx> BaseChecker<'tcx> {
@@ -43,8 +38,17 @@ impl<'tcx> BaseChecker<'tcx> {
 			vars: RefCell::new(HashMap::new()),
 			constants,
 			errors: RefCell::new(vec![]),
-			scopes: RefCell::new(ScopeStack::new()),
 		}
+	}
+
+	pub fn new_scoped_checker(&self) -> BaseChecker<'tcx> {
+		let checker = BaseChecker::new(self.tcx);
+
+		for (id, var) in self.vars.borrow().deref() {
+			checker.add_var(id, var.ty, var.is_assignable);
+		}
+
+		checker
 	}
 
 	pub fn add_error(&self, err: ErrorKind<'tcx>) {
@@ -61,25 +65,8 @@ impl<'tcx> BaseChecker<'tcx> {
 		}
 	}
 
-	pub fn get_current_scope(&self) -> TyScope {
-		self.scopes.borrow().peek()
-	}
-
-	pub fn enter_new_scope(&self) -> TyScope {
-		self.scopes.borrow_mut().push()
-	}
-
-	pub fn leave_current_scope(&self) {
-		self.scopes.borrow_mut().pop();
-	}
-
 	pub fn get_var_ty(&self, id: &Symbol) -> Option<Ty<'tcx>> {
-		let scope = self.get_current_scope();
-
-		self.vars
-			.borrow()
-			.get(id)
-			.map(|var| var.scoped_tys.get(&scope).copied().unwrap_or(var.ty))
+		self.vars.borrow().get(id).map(|var| var.ty)
 	}
 
 	pub fn get_var_is_assignable(&self, id: &Symbol) -> Option<bool> {
@@ -87,18 +74,16 @@ impl<'tcx> BaseChecker<'tcx> {
 	}
 
 	pub fn add_var(&self, id: &Symbol, ty: Ty<'tcx>, is_assignable: bool) {
-		self.vars.borrow_mut().insert(id.clone(), Var {
-			ty,
-			is_assignable,
-			scoped_tys: HashMap::new(),
-		});
+		self.vars
+			.borrow_mut()
+			.insert(id.clone(), Var { ty, is_assignable });
 	}
 
-	pub fn add_scoped_ty(&self, id: &Symbol, scope: TyScope, ty: Ty<'tcx>) {
-		let mut vars = self.vars.borrow_mut();
-
-		if let Some(var) = vars.get_mut(id) {
-			var.scoped_tys.insert(scope, ty);
+	pub fn set_var(&self, id: &Symbol, ty: Ty<'tcx>) {
+		if let Some(var) = self.vars.borrow_mut().get_mut(id) {
+			var.ty = ty;
+		} else {
+			panic!("Variable not found: {:?}", id);
 		}
 	}
 

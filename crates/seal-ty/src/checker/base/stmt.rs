@@ -19,10 +19,14 @@ impl BaseChecker<'_> {
 			Stmt::If(IfStmt {
 				test, cons, alt, ..
 			}) => {
+				let mut scopes = vec![self.new_scoped_checker()];
 				let mut branches = vec![(test, cons)];
+
 				let mut alt = alt.as_ref();
 
 				while let Some(current_alt) = alt {
+					scopes.push(self.new_scoped_checker());
+
 					if let Stmt::If(IfStmt {
 						test,
 						cons,
@@ -37,44 +41,37 @@ impl BaseChecker<'_> {
 					}
 				}
 
-				let mut next_scope = self.get_current_scope().next();
-
-				for (test, cons) in branches {
+				for (i, (test, cons)) in branches.iter().enumerate() {
+					let checker = &scopes[i];
 					let test_ty = self.check_expr(test);
 
 					if let TyKind::Guard(name, narrowed_ty) = test_ty.kind() {
-						self.add_scoped_ty(name, next_scope, *narrowed_ty);
-
 						let current_ty = self.get_var_ty(name).unwrap();
 
-						if let TyKind::Union(current) = current_ty.kind() {
-							let narrowed_arms = match narrowed_ty.kind() {
-								TyKind::Union(narrowed) => narrowed.arms(),
-								_ => &BTreeSet::from([*narrowed_ty]),
-							};
+						checker.set_var(name, *narrowed_ty);
 
-							let rest_arms =
-								current.arms().difference(narrowed_arms).copied().collect();
+						if let Some(next_checker) = scopes.get(i + 1) {
+							if let TyKind::Union(current) = current_ty.kind() {
+								let narrowed_arms = match narrowed_ty.kind() {
+									TyKind::Union(narrowed) => narrowed.arms(),
+									_ => &BTreeSet::from([*narrowed_ty]),
+								};
 
-							self.add_scoped_ty(
-								name,
-								next_scope.next(),
-								self.tcx.new_union(rest_arms),
-							);
+								let rest_arms =
+									current.arms().difference(narrowed_arms).copied().collect();
+
+								next_checker.set_var(name, self.tcx.new_union(rest_arms));
+							}
 						}
 					}
 
-					self.enter_new_scope();
 					if let Stmt::Block(block) = cons.as_ref() {
 						for stmt in &block.stmts {
-							self.check_stmt(stmt);
+							checker.check_stmt(stmt);
 						}
 					} else {
-						self.check_stmt(cons);
+						checker.check_stmt(cons);
 					}
-					self.leave_current_scope();
-
-					next_scope = next_scope.next();
 				}
 			}
 			Stmt::Block(block) => {

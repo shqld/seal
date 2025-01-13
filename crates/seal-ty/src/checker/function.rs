@@ -2,7 +2,6 @@ use std::{cell::Cell, ops::Deref};
 
 use swc_ecma_ast::{BlockStmt, Function, ReturnStmt, Stmt};
 
-use super::scope::TyScope;
 use super::{base::BaseChecker, errors::Error};
 
 use crate::checker::errors::ErrorKind;
@@ -14,7 +13,6 @@ pub struct FunctionChecker<'tcx> {
 	params: Vec<(Symbol, Ty<'tcx>)>,
 	ret: Ty<'tcx>,
 	has_returned: Cell<bool>,
-	root_scope: TyScope,
 }
 
 impl<'tcx> Deref for FunctionChecker<'tcx> {
@@ -37,14 +35,11 @@ impl<'tcx> FunctionChecker<'tcx> {
 			base.add_var(name, *ty, false);
 		}
 
-		let root_scope = base.enter_new_scope();
-
 		FunctionChecker {
 			base,
 			params,
 			ret,
 			has_returned: Cell::new(false),
-			root_scope,
 		}
 	}
 
@@ -76,10 +71,6 @@ impl<'tcx> FunctionChecker<'tcx> {
 		if !matches!(self.ret.kind(), TyKind::Void) && !self.has_returned.get() {
 			self.add_error(ErrorKind::UnexpectedVoid);
 		}
-
-		assert_eq!(self.root_scope, self.get_current_scope());
-
-		self.leave_current_scope();
 
 		crate::kind::Function::new(
 			// TODO: check_function(self, ..)

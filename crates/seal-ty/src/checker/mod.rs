@@ -10,7 +10,6 @@ mod base;
 mod class;
 pub mod errors;
 mod function;
-mod scope;
 
 #[derive(Debug)]
 pub struct Checker<'tcx> {
