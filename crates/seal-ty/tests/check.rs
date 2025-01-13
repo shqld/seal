@@ -620,3 +620,80 @@ fail!(
     "#,
 	&["Type 'string' is not assignable to type 'number'."]
 );
+
+pass!(
+	number_proto_,
+	r#"
+        let n = 42;
+
+        n.toExponential satisfies (fractionDigits?: number) => string;
+        n.toFixed satisfies (fractionDigits?: number) => string;
+        n.toLocaleString satisfies () => string;
+        n.toPrecision satisfies (precision?: number) => string;
+    "#
+);
+
+fail!(
+	number_proto_non_existent_method_,
+	r#"
+        let n = 42;
+        n.foo;
+    "#,
+	&["Property 'foo' does not exist on type 'number'."]
+);
+
+pass!(
+	string_proto_,
+	r#"
+        let s = "hello";
+
+        s.length satisfies number;
+        s.at satisfies (index: number) => string;
+        s.charAt satisfies (index: number) => string;
+        s.charCodeAt satisfies (index: number) => number;
+        s.codePointAt satisfies (index: number) => number;
+        s.concat satisfies (strings: string) => string;
+        s.endsWith satisfies (searchString: string) => boolean;
+        s.includes satisfies (searchString: string) => boolean;
+        s.indexOf satisfies (searchString: string) => number;
+        s.isWellFormed satisfies () => boolean;
+        s.lastIndexOf satisfies (searchString: string) => number;
+        s.localeCompare satisfies (compareString: string) => number;
+        // TODO: object
+        // s.match satisfies (regexp: string) => object;
+        // TODO: object
+        // s.matchAll satisfies (regexp: string) => object;
+        s.normalize satisfies (form: string) => string;
+        s.padEnd satisfies (targetLength: number, padString: string) => string;
+        s.padStart satisfies (targetLength: number, padString: string) => string;
+        s.repeat satisfies (count: number) => string;
+        s.replace satisfies (searchValue: string, replaceValue: string) => string;
+        s.replaceAll satisfies (searchValue: string, replaceValue: string) => string;
+        s.search satisfies (regexp: string) => number;
+        s.slice satisfies (start: number, end: number) => string;
+        // TODO: object
+        // s.split satisfies (separator: string, limit: number) => object;
+        s.startsWith satisfies (searchString: string, position: number) => boolean;
+        s.substr satisfies (start: number, length: number) => string;
+        s.substring satisfies (start: number, end: number) => string;
+        s.toLocaleLowerCase satisfies () => string;
+        s.toLocaleUpperCase satisfies () => string;
+        s.toLowerCase satisfies () => string;
+        s.toUpperCase satisfies () => string;
+        s.toWellFormed satisfies () => string;
+        s.trim satisfies () => string;
+        s.trimEnd satisfies () => string;
+        s.trimLeft satisfies () => string;
+        s.trimRight satisfies () => string;
+        s.trimStart satisfies () => string;
+    "#
+);
+
+fail!(
+	string_proto_non_existent_method_,
+	r#"
+        let s = "hello";
+        s.foo;
+    "#,
+	&["Property 'foo' does not exist on type '\"hello\"'."]
+);

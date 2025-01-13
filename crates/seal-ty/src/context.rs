@@ -1,9 +1,10 @@
 use std::{
-	collections::{BTreeMap, BTreeSet},
+	collections::{BTreeMap, BTreeSet, HashMap},
 	rc::Rc,
 };
 
 use swc_atoms::Atom;
+use swc_common::SyntaxContext;
 
 use crate::{
 	Ty, TyKind,
@@ -82,25 +83,106 @@ pub struct TyConstants<'tcx> {
 	pub lazy: Ty<'tcx>,
 
 	pub type_of: Ty<'tcx>,
+
+	pub proto_number: HashMap<Atom, Ty<'tcx>>,
+	pub proto_string: HashMap<Atom, Ty<'tcx>>,
 }
 
 impl<'tcx> TyConstants<'tcx> {
 	pub fn new(tcx: &'tcx TyContext<'tcx>) -> Self {
+		let boolean = tcx.new_ty(TyKind::Boolean);
+		let number = tcx.new_ty(TyKind::Number);
+		let string = tcx.new_ty(TyKind::String(None));
+		let err = tcx.new_ty(TyKind::Err);
+		let void = tcx.new_ty(TyKind::Void);
+		let never = tcx.new_ty(TyKind::Never);
+		let lazy = tcx.new_ty(TyKind::Lazy);
+
+		// TODO: placeholder
+		let object = tcx.new_ty(TyKind::Err);
+
+		macro_rules! parse_prop {
+			($name:ident: $ty:expr) => {
+				(Atom::new(stringify!($name)), $ty)
+			};
+		}
+
+		macro_rules! parse_method {
+            ($function_name:ident: ($($param_name:ident: $param_ty:expr),*) => $ret_ty:expr) => {
+                (
+                    Atom::new(stringify!($function_name)),
+                    tcx.new_ty(TyKind::Function(Function::new(
+                        vec![$((Symbol::new((Atom::new(stringify!($param_name)), SyntaxContext::empty())), $param_ty)),*],
+                        $ret_ty,
+                    )))
+                )
+            };
+		}
+
 		Self {
-			boolean: tcx.new_ty(TyKind::Boolean),
-			number: tcx.new_ty(TyKind::Number),
-			string: tcx.new_ty(TyKind::String(None)),
-			err: tcx.new_ty(TyKind::Err),
-			void: tcx.new_ty(TyKind::Void),
-			never: tcx.new_ty(TyKind::Never),
-			lazy: tcx.new_ty(TyKind::Lazy),
+			boolean,
+			number,
+			string,
+			err,
+			void,
+			never,
+			lazy,
 
 			type_of: tcx.new_union(
 				["boolean", "number", "string"]
-					.iter()
-					.map(|s| tcx.new_const_string(Atom::new(*s)))
+					.into_iter()
+					.map(|s| tcx.new_const_string(Atom::new(s)))
 					.collect(),
 			),
+
+			proto_number: [
+				parse_method!(toExponential: (fractionDigits: number) => string),
+				parse_method!(toFixed: (digits: number) => string),
+				parse_method!(toLocaleString: () => string),
+				parse_method!(toPrecision: (precision: number) => string),
+			]
+			.into_iter()
+			.collect(),
+			proto_string: [
+				parse_prop!(length: number),
+				parse_method!(at: (index: number) => string),
+				parse_method!(charAt: (index: number) => string),
+				parse_method!(charCodeAt: (index: number) => number),
+				parse_method!(codePointAt: (index: number) => number),
+				parse_method!(concat: (strings: string) => string),
+				parse_method!(endsWith: (searchString: string) => boolean),
+				parse_method!(includes: (searchString: string) => boolean),
+				parse_method!(indexOf: (searchString: string) => number),
+				parse_method!(isWellFormed: () => boolean),
+				parse_method!(lastIndexOf: (searchString: string) => number),
+				parse_method!(localeCompare: (compareString: string) => number),
+				parse_method!(match: (regexp: string) => object),
+				parse_method!(matchAll: (regexp: string) => object),
+				parse_method!(normalize: (form: string) => string),
+				parse_method!(padEnd: (targetLength: number, padString: string) => string),
+				parse_method!(padStart: (targetLength: number, padString: string) => string),
+				parse_method!(repeat: (count: number) => string),
+				parse_method!(replace: (searchValue: string, replaceValue: string) => string),
+				parse_method!(replaceAll: (searchValue: string, replaceValue: string) => string),
+				parse_method!(search: (regexp: string) => number),
+				parse_method!(slice: (start: number, end: number) => string),
+				parse_method!(split: (separator: string, limit: number) => object),
+				parse_method!(startsWith: (searchString: string, position: number) => boolean),
+				parse_method!(substr: (start: number, length: number) => string),
+				parse_method!(substring: (start: number, end: number) => string),
+				parse_method!(toLocaleLowerCase: () => string),
+				parse_method!(toLocaleUpperCase: () => string),
+				parse_method!(toLowerCase: () => string),
+				parse_method!(toUpperCase: () => string),
+				parse_method!(toWellFormed: () => string),
+				parse_method!(trim: () => string),
+				parse_method!(trimEnd: () => string),
+				parse_method!(trimLeft: () => string),
+				parse_method!(trimRight: () => string),
+				parse_method!(trimStart: () => string),
+			]
+			.into_iter()
+			.collect(),
 		}
 	}
 }

@@ -146,6 +146,25 @@ impl<'tcx> BaseChecker<'tcx> {
 
 						self.tcx.new_union(prop_arms)
 					}
+					TyKind::Number => self
+						.constants
+						.proto_number
+						.get(&key)
+						.copied()
+						.unwrap_or_else(|| {
+							self.add_error(ErrorKind::PropertyDoesNotExist(obj_ty, key));
+							self.constants.err
+						}),
+					TyKind::String(_) => self
+						.constants
+						.proto_string
+						.get(&key)
+						.copied()
+						.unwrap_or_else(|| {
+							self.add_error(ErrorKind::PropertyDoesNotExist(obj_ty, key));
+							self.constants.err
+						}),
+					TyKind::Err => self.constants.err,
 					_ => {
 						// TODO: other error kind? (e.g. "Property access on non-object is not allowed.")
 						self.add_error(ErrorKind::PropertyDoesNotExist(obj_ty, key));
