@@ -7,6 +7,11 @@ use super::{base::BaseChecker, errors::Error};
 use crate::checker::errors::ErrorKind;
 use crate::{Ty, TyKind, context::TyContext, symbol::Symbol};
 
+pub struct FunctionCheckerResult<'tcx> {
+	pub ty: crate::kind::Function<'tcx>,
+	pub errors: Vec<Error<'tcx>>,
+}
+
 #[derive(Debug)]
 pub struct FunctionChecker<'tcx> {
 	base: BaseChecker<'tcx>,
@@ -43,27 +48,25 @@ impl<'tcx> FunctionChecker<'tcx> {
 		}
 	}
 
-	pub fn into_result(self) -> Result<(), Vec<Error<'tcx>>> {
-		self.base.into_result()
-	}
-
-	pub fn check_function(&self, function: &Function) -> crate::kind::Function<'tcx> {
+	pub fn check_function(self, function: &Function) -> FunctionCheckerResult<'tcx> {
 		let body = match &function.body {
 			Some(body) => body,
 			None => {
-				self.add_error(ErrorKind::MissingBody);
-				return crate::kind::Function::new(
-					// TODO: check_function(self, ..)
-					self.params.clone(),
-					self.ret,
-				);
+				return FunctionCheckerResult {
+					ty: crate::kind::Function::new(
+						// TODO: check_function(self, ..)
+						self.params.clone(),
+						self.ret,
+					),
+					errors: vec![Error::new(ErrorKind::MissingBody)],
+				};
 			}
 		};
 
 		self.check_body(body)
 	}
 
-	pub fn check_body(&self, body: &BlockStmt) -> crate::kind::Function<'tcx> {
+	pub fn check_body(self, body: &BlockStmt) -> FunctionCheckerResult<'tcx> {
 		for stmt in &body.stmts {
 			self.check_stmt(stmt);
 		}
@@ -72,11 +75,14 @@ impl<'tcx> FunctionChecker<'tcx> {
 			self.add_error(ErrorKind::UnexpectedVoid);
 		}
 
-		crate::kind::Function::new(
-			// TODO: check_function(self, ..)
-			self.params.clone(),
-			self.ret,
-		)
+		FunctionCheckerResult {
+			ty: crate::kind::Function::new(
+				// TODO: check_function(self, ..)
+				self.params.clone(),
+				self.ret,
+			),
+			errors: self.base.errors.into_inner(),
+		}
 	}
 
 	pub fn check_stmt(&self, stmt: &Stmt) {

@@ -9,6 +9,11 @@ use super::function::FunctionChecker;
 
 use crate::{context::TyContext, symbol::Symbol};
 
+pub struct ClassCheckerResult<'tcx> {
+	pub ty: crate::kind::Class<'tcx>,
+	pub errors: Vec<Error<'tcx>>,
+}
+
 #[derive(Debug)]
 pub struct ClassChecker<'tcx> {
 	// TODO: replace with more basic checker (only with tcx, errors, and constants)
@@ -34,11 +39,7 @@ impl<'tcx> ClassChecker<'tcx> {
 		}
 	}
 
-	pub fn into_result(self) -> Result<(), Vec<Error<'tcx>>> {
-		self.base.into_result()
-	}
-
-	pub fn check_class(&self, class: &Class) -> crate::kind::Class<'tcx> {
+	pub fn check_class(self, class: &Class) -> ClassCheckerResult<'tcx> {
 		let mut ctor = None;
 		let mut fields = BTreeMap::new();
 
@@ -111,24 +112,25 @@ impl<'tcx> ClassChecker<'tcx> {
 					};
 
 					let checker = FunctionChecker::new(self.tcx, params, ret);
-					let function = checker.check_function(&method.function);
+					let result = checker.check_function(&method.function);
 
-					if let Err(errors) = checker.into_result() {
-						for error in errors {
-							self.add_error(error.kind);
-						}
-					};
+					for error in result.errors {
+						self.add_error(error.kind);
+					}
 
-					fields.insert(key, self.tcx.new_function(function));
+					fields.insert(key, self.tcx.new_function(result.ty));
 				}
 				_ => todo!("{:#?}", member),
 			}
 		}
 
-		crate::kind::Class::new(
-			ctor,
-			Rc::new(crate::kind::Interface::new(self.name.clone(), fields)),
-		)
+		ClassCheckerResult {
+			ty: crate::kind::Class::new(
+				ctor,
+				Rc::new(crate::kind::Interface::new(self.name.clone(), fields)),
+			),
+			errors: self.base.errors.into_inner(),
+		}
 	}
 
 	pub fn check_constructor(&self, consructor: &Constructor) -> crate::kind::Function<'tcx> {
@@ -179,11 +181,9 @@ impl<'tcx> ClassChecker<'tcx> {
 			}
 		}
 
-		if let Err(errors) = checker.into_result() {
-			for error in errors {
-				self.add_error(error.kind);
-			}
-		};
+		for error in checker.errors.into_inner() {
+			self.add_error(error.kind);
+		}
 
 		crate::kind::Function::new(params, self.constants.void)
 	}

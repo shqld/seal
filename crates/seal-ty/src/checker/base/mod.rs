@@ -26,7 +26,7 @@ pub struct BaseChecker<'tcx> {
 	pub tcx: &'tcx TyContext<'tcx>,
 	pub constants: TyConstants<'tcx>,
 	vars: RefCell<HashMap<Symbol, Var<'tcx>>>,
-	errors: RefCell<Vec<Error<'tcx>>>,
+	pub errors: RefCell<Vec<Error<'tcx>>>,
 }
 
 impl<'tcx> BaseChecker<'tcx> {
@@ -53,16 +53,6 @@ impl<'tcx> BaseChecker<'tcx> {
 
 	pub fn add_error(&self, err: ErrorKind<'tcx>) {
 		self.errors.borrow_mut().push(Error::new(err));
-	}
-
-	pub fn into_result(self) -> Result<(), Vec<Error<'tcx>>> {
-		let errors = self.errors.into_inner();
-
-		if errors.is_empty() {
-			Ok(())
-		} else {
-			Err(errors)
-		}
 	}
 
 	pub fn get_var_ty(&self, id: &Symbol) -> Option<Ty<'tcx>> {

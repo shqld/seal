@@ -233,15 +233,13 @@ impl<'tcx> BaseChecker<'tcx> {
 							checker.add_var(name, var.ty, var.is_assignable);
 						}
 
-						let function = checker.check_body(body);
+						let result = checker.check_body(body);
 
-						if let Err(errors) = checker.into_result() {
-							for error in errors {
-								self.add_error(error.kind);
-							}
+						for error in result.errors {
+							self.add_error(error.kind);
 						}
 
-						self.tcx.new_function(function)
+						self.tcx.new_function(result.ty)
 					}
 				}
 			}

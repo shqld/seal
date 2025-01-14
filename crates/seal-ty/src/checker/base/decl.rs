@@ -102,29 +102,25 @@ impl BaseChecker<'_> {
 				};
 
 				let checker = FunctionChecker::new(self.tcx, params, ret);
-				let function = checker.check_function(function);
+				let result = checker.check_function(function);
 
-				if let Err(errors) = checker.into_result() {
-					for error in errors {
-						self.add_error(error.kind);
-					}
-				};
+				for error in result.errors {
+					self.add_error(error.kind);
+				}
 
-				self.add_var(&name, self.tcx.new_function(function), false);
+				self.add_var(&name, self.tcx.new_function(result.ty), false);
 			}
 			Decl::Class(ClassDecl { ident, class, .. }) => {
 				let name = Symbol::new(ident.to_id());
 
 				let checker = ClassChecker::new(self.tcx, &name);
-				let class = checker.check_class(class);
+				let result = checker.check_class(class);
 
-				if let Err(errors) = checker.into_result() {
-					for error in errors {
-						self.add_error(error.kind);
-					}
-				};
+				for error in result.errors {
+					self.add_error(error.kind);
+				}
 
-				self.add_var(&name, self.tcx.new_class(class), false);
+				self.add_var(&name, self.tcx.new_class(result.ty), false);
 			}
 			_ => todo!("{:#?}", decl),
 		}

@@ -48,7 +48,13 @@ impl<'tcx> Checker<'tcx> {
 			}
 		};
 
-		self.base.into_result()
+		let errors = self.base.errors.into_inner();
+
+		if errors.is_empty() {
+			Ok(())
+		} else {
+			Err(errors)
+		}
 	}
 
 	pub fn check_stmt(&self, stmt: &Stmt) {
