@@ -133,16 +133,12 @@ impl<'tcx> Union<'tcx> {
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Object<'tcx> {
-	fields: BTreeMap<Atom, Ty<'tcx>>,
+	pub fields: BTreeMap<Atom, Ty<'tcx>>,
 }
 
 impl<'tcx> Object<'tcx> {
 	pub fn new(fields: BTreeMap<Atom, Ty<'tcx>>) -> Self {
 		Self { fields }
-	}
-
-	pub fn fields(&self) -> &BTreeMap<Atom, Ty<'tcx>> {
-		&self.fields
 	}
 
 	pub fn get_prop(&self, key: &Atom) -> Option<Ty<'tcx>> {

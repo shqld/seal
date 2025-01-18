@@ -3,6 +3,7 @@ use swc_ecma_ast::{ClassDecl, Decl, FnDecl, Pat, VarDeclKind};
 use crate::{
 	TyKind,
 	checker::{class::ClassChecker, errors::ErrorKind, function::FunctionChecker},
+	sir::{Def, Value},
 	symbol::Symbol,
 };
 
@@ -33,8 +34,9 @@ impl BaseChecker<'_> {
 					let name = Symbol::new(binding.to_id());
 
 					if let VarDeclKind::Var = var.kind {
-						self.add_var(
+						self.set_binding(
 							&name,
+							None,
 							// NOTE: to make every reference to the 'var' variable an error, set this type to never
 							self.constants.never,
 							false,
@@ -42,30 +44,42 @@ impl BaseChecker<'_> {
 						continue;
 					}
 
-					let ty = binding
+					let binding_ty = binding
 						.type_ann
 						.as_ref()
 						.map(|type_ann| self.build_ts_type(&type_ann.type_ann))
 						.unwrap_or_else(|| self.constants.lazy);
 
 					if let Some(init) = &var_declarator.init {
-						let expected = ty;
 						let actual = self.check_expr(init);
 
-						// if no type is specified to the declaration, replace with actual type
-						if let TyKind::Lazy = ty.kind() {
-							self.add_var(&name, actual, !is_const);
+						// TODO: binding is Option<Local>, so we can remove TyKind::Lazy and check if it's None
+						if let TyKind::Lazy = binding_ty.kind() {
+							// if no type is specified to the declaration, replace with actual type
+							self.set_binding(
+								&name,
+								Some(actual),
+								match is_const {
+									true => actual.ty,
+									false => self.widen(actual.ty),
+								},
+								!is_const,
+							);
 							return;
 						}
 
-						if !self.satisfies(expected, actual) {
-							self.raise_type_error(expected, actual);
+						if !self.satisfies(binding_ty, actual.ty) {
+							self.raise_type_error(binding_ty, actual.ty);
 						}
-					} else if is_const {
-						self.add_error(ErrorKind::ConstMissingInit);
-					};
 
-					self.add_var(&name, ty, !is_const);
+						self.set_binding(&name, Some(actual), binding_ty, !is_const);
+					} else {
+						if is_const {
+							self.add_error(ErrorKind::ConstMissingInit);
+						}
+
+						self.set_binding(&name, None, binding_ty, !is_const);
+					}
 				}
 			}
 			Decl::Fn(FnDecl {
@@ -108,7 +122,14 @@ impl BaseChecker<'_> {
 					self.add_error(error.kind);
 				}
 
-				self.add_var(&name, self.tcx.new_function(result.ty), false);
+				let ty = self.tcx.new_function(result.ty);
+
+				self.set_binding(
+					&name,
+					Some(self.add_local(ty, Value::Ref(self.tcx.add_def(Def::Func(result.def))))),
+					ty,
+					false,
+				);
 			}
 			Decl::Class(ClassDecl { ident, class, .. }) => {
 				let name = Symbol::new(ident.to_id());
@@ -120,7 +141,14 @@ impl BaseChecker<'_> {
 					self.add_error(error.kind);
 				}
 
-				self.add_var(&name, self.tcx.new_class(result.ty), false);
+				let ty = self.tcx.new_class(result.ty);
+
+				self.set_binding(
+					&name,
+					Some(self.add_local(ty, Value::Ref(self.tcx.add_def(Def::Class(result.def))))),
+					ty,
+					false,
+				);
 			}
 			_ => todo!("{:#?}", decl),
 		}

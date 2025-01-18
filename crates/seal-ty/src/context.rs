@@ -1,5 +1,6 @@
 use std::{
-	collections::{BTreeMap, BTreeSet, HashMap},
+	cell::{Cell, RefCell},
+	collections::{BTreeSet, HashMap},
 	fmt::Debug,
 	rc::Rc,
 };
@@ -11,16 +12,21 @@ use crate::{
 	Ty, TyKind,
 	intern::interner::Interner,
 	kind::{Class, Function, Interface, Object, Union},
+	sir::{Def, DefId},
 	symbol::Symbol,
 };
 
 pub struct TyContext<'tcx> {
 	interner: Interner<'tcx, TyKind<'tcx>>,
+	definitions: RefCell<HashMap<DefId, Def>>,
+	definition_counter: Cell<usize>,
 }
 
 impl Debug for TyContext<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("TyContext").finish()
+		f.debug_struct("TyContext")
+			.field("definitions", &self.definitions.borrow())
+			.finish()
 	}
 }
 
@@ -29,7 +35,27 @@ impl TyContext<'_> {
 	pub fn new() -> Self {
 		Self {
 			interner: Interner::new(),
+			definitions: RefCell::new(HashMap::new()),
+			definition_counter: Cell::new(0),
 		}
+	}
+}
+
+impl TyContext<'_> {
+	fn new_def_id(&self) -> DefId {
+		let id = self.definition_counter.get();
+		self.definition_counter.set(id + 1);
+
+		DefId::new(id)
+	}
+
+	pub fn add_def(&self, def: Def) -> DefId {
+		let id = self.new_def_id();
+		let mut defs = self.definitions.borrow_mut();
+
+		defs.insert(id, def);
+
+		id
 	}
 }
 
@@ -69,8 +95,8 @@ impl<'tcx> TyContext<'tcx> {
 		self.new_union(tys)
 	}
 
-	pub fn new_object(&'tcx self, fields: BTreeMap<Atom, Ty<'tcx>>) -> Ty<'tcx> {
-		self.new_ty(TyKind::Object(Object::new(fields)))
+	pub fn new_object(&'tcx self, obj: Object<'tcx>) -> Ty<'tcx> {
+		self.new_ty(TyKind::Object(obj))
 	}
 
 	pub fn new_guard(&'tcx self, name: Symbol, ty: Ty<'tcx>) -> Ty<'tcx> {

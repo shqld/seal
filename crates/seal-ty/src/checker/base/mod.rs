@@ -4,34 +4,39 @@ mod narrow;
 mod satisfies;
 mod stmt;
 mod ts_type;
+mod widen;
 
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, ops::Deref};
+use std::{cell::RefCell, collections::HashMap, fmt::Debug};
 
 use crate::{
 	Ty,
 	context::{TyConstants, TyContext},
+	sir::{Local, LocalId, Value},
 	symbol::Symbol,
 };
 
 use super::errors::{Error, ErrorKind};
 
-#[derive(Debug)]
-struct Var<'tcx> {
+#[derive(Debug, Clone, Copy)]
+struct Binding<'tcx> {
 	ty: Ty<'tcx>,
+	current: Option<Local<'tcx>>,
 	is_assignable: bool,
 }
 
 pub struct BaseChecker<'tcx> {
 	pub tcx: &'tcx TyContext<'tcx>,
 	pub constants: TyConstants<'tcx>,
-	vars: RefCell<HashMap<Symbol, Var<'tcx>>>,
+	bindings: RefCell<HashMap<Symbol, Binding<'tcx>>>,
+	pub locals: RefCell<HashMap<LocalId, Value>>,
 	pub errors: RefCell<Vec<Error<'tcx>>>,
 }
 
 impl Debug for BaseChecker<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("BaseChecker")
-			.field("vars", &self.vars.borrow())
+			.field("bindings", &self.bindings.borrow())
+			.field("locals", &self.locals.borrow())
 			.field("errors", &self.errors.borrow())
 			.finish()
 	}
@@ -43,17 +48,27 @@ impl<'tcx> BaseChecker<'tcx> {
 
 		BaseChecker {
 			tcx,
-			vars: RefCell::new(HashMap::new()),
 			constants,
+			bindings: RefCell::new(HashMap::new()),
+			locals: RefCell::new(HashMap::new()),
 			errors: RefCell::new(vec![]),
 		}
 	}
 
+	pub fn add_local(&self, ty: Ty<'tcx>, value: Value) -> Local<'tcx> {
+		let mut locals = self.locals.borrow_mut();
+		let id = LocalId::new(locals.len());
+		locals.insert(id, value);
+
+		Local { ty, id }
+	}
+
 	pub fn new_scoped_checker(&self) -> BaseChecker<'tcx> {
 		let checker = BaseChecker::new(self.tcx);
+		let vars = self.bindings.borrow();
 
-		for (id, var) in self.vars.borrow().deref() {
-			checker.add_var(id, var.ty, var.is_assignable);
+		for (name, binding) in vars.iter() {
+			checker.set_binding(name, binding.current, binding.ty, binding.is_assignable);
 		}
 
 		checker
@@ -63,22 +78,26 @@ impl<'tcx> BaseChecker<'tcx> {
 		self.errors.borrow_mut().push(Error::new(err));
 	}
 
-	pub fn get_var_ty(&self, id: &Symbol) -> Option<Ty<'tcx>> {
-		self.vars.borrow().get(id).map(|var| var.ty)
+	fn get_binding(&self, name: &Symbol) -> Option<Binding<'tcx>> {
+		self.bindings.borrow().get(name).copied()
 	}
 
-	pub fn get_var_is_assignable(&self, id: &Symbol) -> Option<bool> {
-		self.vars.borrow().get(id).map(|var| var.is_assignable)
+	pub fn set_binding(
+		&self,
+		name: &Symbol,
+		current: Option<Local<'tcx>>,
+		ty: Ty<'tcx>,
+		is_assignable: bool,
+	) {
+		self.bindings.borrow_mut().insert(name.clone(), Binding {
+			ty,
+			current,
+			is_assignable,
+		});
 	}
 
-	pub fn add_var(&self, id: &Symbol, ty: Ty<'tcx>, is_assignable: bool) {
-		self.vars
-			.borrow_mut()
-			.insert(id.clone(), Var { ty, is_assignable });
-	}
-
-	pub fn set_var(&self, id: &Symbol, ty: Ty<'tcx>) {
-		if let Some(var) = self.vars.borrow_mut().get_mut(id) {
+	pub fn set_ty(&self, id: &Symbol, ty: Ty<'tcx>) {
+		if let Some(var) = self.bindings.borrow_mut().get_mut(id) {
 			var.ty = ty;
 		} else {
 			panic!("Variable not found: {:?}", id);
