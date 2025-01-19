@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::{cell::Cell, ops::Deref};
 
 use swc_ecma_ast::{BlockStmt, Function, ReturnStmt, Stmt};
@@ -6,12 +5,10 @@ use swc_ecma_ast::{BlockStmt, Function, ReturnStmt, Stmt};
 use super::{base::BaseChecker, errors::Error};
 
 use crate::checker::errors::ErrorKind;
-use crate::sir::{self, Value};
 use crate::{Ty, TyKind, context::TyContext, symbol::Symbol};
 
 pub struct FunctionCheckerResult<'tcx> {
 	pub ty: crate::kind::Function<'tcx>,
-	pub def: sir::Func,
 	pub errors: Vec<Error<'tcx>>,
 }
 
@@ -40,8 +37,7 @@ impl<'tcx> FunctionChecker<'tcx> {
 		let base = BaseChecker::new(tcx);
 
 		for (name, ty) in &params {
-			let param = base.add_local(*ty, Value::Param);
-			base.set_binding(name, Some(param), *ty, false);
+			base.add_var(name, *ty, false);
 		}
 
 		FunctionChecker {
@@ -62,9 +58,6 @@ impl<'tcx> FunctionChecker<'tcx> {
 						self.params.clone(),
 						self.ret,
 					),
-					def: sir::Func {
-						locals: HashMap::new(),
-					},
 					errors: vec![Error::new(ErrorKind::MissingBody)],
 				};
 			}
@@ -88,9 +81,6 @@ impl<'tcx> FunctionChecker<'tcx> {
 				self.params.clone(),
 				self.ret,
 			),
-			def: sir::Func {
-				locals: self.base.locals.into_inner(),
-			},
 			errors: self.base.errors.into_inner(),
 		}
 	}
@@ -103,8 +93,8 @@ impl<'tcx> FunctionChecker<'tcx> {
 				if let Some(arg) = arg {
 					let actual = self.check_expr(arg);
 
-					if !self.satisfies(expected, actual.ty) {
-						self.raise_type_error(expected, actual.ty);
+					if !self.satisfies(expected, actual) {
+						self.raise_type_error(expected, actual);
 					}
 				} else if !matches!(expected.kind(), TyKind::Void) {
 					self.add_error(ErrorKind::UnexpectedVoid);

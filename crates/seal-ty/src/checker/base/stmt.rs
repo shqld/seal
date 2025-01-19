@@ -43,15 +43,15 @@ impl BaseChecker<'_> {
 
 				for (i, (test, cons)) in branches.iter().enumerate() {
 					let checker = &scopes[i];
-					let test = self.check_expr(test);
+					let test_ty = self.check_expr(test);
 
-					if let TyKind::Guard(name, narrowed_ty) = test.ty.kind() {
-						let current = self.get_binding(name).unwrap();
+					if let TyKind::Guard(name, narrowed_ty) = test_ty.kind() {
+						let current_ty = self.get_var_ty(name).unwrap();
 
-						checker.set_ty(name, *narrowed_ty);
+						checker.set_var(name, *narrowed_ty);
 
 						if let Some(next_checker) = scopes.get(i + 1) {
-							if let TyKind::Union(current) = current.ty.kind() {
+							if let TyKind::Union(current) = current_ty.kind() {
 								let narrowed_arms = match narrowed_ty.kind() {
 									TyKind::Union(narrowed) => narrowed.arms(),
 									_ => &BTreeSet::from([*narrowed_ty]),
@@ -60,7 +60,7 @@ impl BaseChecker<'_> {
 								let rest_arms =
 									current.arms().difference(narrowed_arms).copied().collect();
 
-								next_checker.set_ty(name, self.tcx.new_union(rest_arms));
+								next_checker.set_var(name, self.tcx.new_union(rest_arms));
 							}
 						}
 					}

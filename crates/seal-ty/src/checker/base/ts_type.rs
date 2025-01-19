@@ -68,18 +68,18 @@ impl<'tcx> BaseChecker<'tcx> {
 					}
 				}
 
-				self.tcx.new_object(crate::kind::Object { fields })
+				self.tcx.new_object(fields)
 			}
 			TsType::TsTypeRef(TsTypeRef { type_name, .. }) => {
 				let name = Symbol::new(match type_name {
 					TsEntityName::Ident(ident) => ident.to_id(),
 					TsEntityName::TsQualifiedName(_) => unimplemented!(),
 				});
-				let binding = self.get_binding(&name).unwrap();
+				let ty = self.get_var_ty(&name).unwrap();
 
-				match binding.ty.kind() {
+				match ty.kind() {
 					TyKind::Class(class) => self.tcx.new_interface(class.interface()),
-					_ => binding.ty,
+					_ => ty,
 				}
 			}
 			_ => todo!("{:#?}", tstype),

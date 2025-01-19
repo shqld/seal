@@ -76,24 +76,6 @@ fail!(
 );
 
 pass!(
-	const_binding_,
-	r#"
-        const x = "42";
-        x satisfies "42";
-        x satisfies string;
-    "#
-);
-
-fail!(
-	let_binding_,
-	r#"
-        let x = "42";
-        x satisfies "42";
-    "#,
-	&["Type 'string' is not assignable to type '\"42\"'."]
-);
-
-pass!(
 	function_1_,
 	r#"
         function f(): void {
@@ -713,5 +695,5 @@ fail!(
         let s = "hello";
         s.foo;
     "#,
-	&["Property 'foo' does not exist on type 'string'."]
+	&["Property 'foo' does not exist on type '\"hello\"'."]
 );

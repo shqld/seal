@@ -3,7 +3,6 @@ pub mod context;
 mod intern;
 mod kind;
 pub mod parse;
-pub mod sir;
 pub mod symbol;
 mod ty;
 

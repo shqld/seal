@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::{collections::BTreeMap, ops::Deref};
 
@@ -8,12 +7,10 @@ use super::base::BaseChecker;
 use super::errors::{Error, ErrorKind};
 use super::function::FunctionChecker;
 
-use crate::sir::{self, Value};
 use crate::{context::TyContext, symbol::Symbol};
 
 pub struct ClassCheckerResult<'tcx> {
 	pub ty: crate::kind::Class<'tcx>,
-	pub def: sir::Class,
 	pub errors: Vec<Error<'tcx>>,
 }
 
@@ -44,8 +41,7 @@ impl<'tcx> ClassChecker<'tcx> {
 
 	pub fn check_class(self, class: &Class) -> ClassCheckerResult<'tcx> {
 		let mut ctor = None;
-		let mut field_tys = BTreeMap::new();
-		let mut methods = vec![];
+		let mut fields = BTreeMap::new();
 
 		for member in &class.body {
 			match member {
@@ -66,20 +62,20 @@ impl<'tcx> ClassChecker<'tcx> {
 
 					let ty = match (ty, init) {
 						(Some(ty), Some(init)) => {
-							if !self.satisfies(ty, init.ty) {
-								self.raise_type_error(ty, init.ty);
+							if !self.satisfies(ty, init) {
+								self.raise_type_error(ty, init);
 							}
 							ty
 						}
 						(Some(ty), None) => ty,
-						(None, Some(init)) => init.ty,
+						(None, Some(init)) => init,
 						(None, None) => {
 							self.add_error(ErrorKind::ClassPropMissingTypeAnnOrInit);
 							self.constants.err
 						}
 					};
 
-					field_tys.insert(key, ty);
+					fields.insert(key, ty);
 				}
 				ClassMember::Method(method) => {
 					let key = match &method.key {
@@ -122,32 +118,22 @@ impl<'tcx> ClassChecker<'tcx> {
 						self.add_error(error.kind);
 					}
 
-					field_tys.insert(key, self.tcx.new_function(result.ty));
-					methods.push(result.def);
+					fields.insert(key, self.tcx.new_function(result.ty));
 				}
 				_ => todo!("{:#?}", member),
 			}
 		}
 
-		let (ctor_ty, ctor) = match ctor {
-			Some((ctor_ty, ctor)) => (Some(ctor_ty), Some(ctor)),
-			None => (None, None),
-		};
-
 		ClassCheckerResult {
 			ty: crate::kind::Class::new(
-				ctor_ty,
-				Rc::new(crate::kind::Interface::new(self.name.clone(), field_tys)),
+				ctor,
+				Rc::new(crate::kind::Interface::new(self.name.clone(), fields)),
 			),
-			def: sir::Class { ctor, methods },
 			errors: self.base.errors.into_inner(),
 		}
 	}
 
-	pub fn check_constructor(
-		&self,
-		consructor: &Constructor,
-	) -> (crate::kind::Function<'tcx>, sir::Func) {
+	pub fn check_constructor(&self, consructor: &Constructor) -> crate::kind::Function<'tcx> {
 		let mut params = vec![];
 		for param in &consructor.params {
 			match param {
@@ -175,20 +161,14 @@ impl<'tcx> ClassChecker<'tcx> {
 		let checker = BaseChecker::new(self.tcx);
 
 		for (name, ty) in &params {
-			let param = checker.add_local(*ty, Value::Param);
-			checker.set_binding(name, Some(param), *ty, false);
+			checker.add_var(name, *ty, false);
 		}
 
 		let body = match &consructor.body {
 			Some(body) => body,
 			_ => {
 				self.add_error(ErrorKind::MissingBody);
-				return (
-					crate::kind::Function::new(params, self.constants.void),
-					sir::Func {
-						locals: HashMap::new(),
-					},
-				);
+				return crate::kind::Function::new(params, self.constants.void);
 			}
 		};
 
@@ -205,11 +185,6 @@ impl<'tcx> ClassChecker<'tcx> {
 			self.add_error(error.kind);
 		}
 
-		(
-			crate::kind::Function::new(params, self.constants.void),
-			sir::Func {
-				locals: checker.locals.into_inner(),
-			},
-		)
+		crate::kind::Function::new(params, self.constants.void)
 	}
 }

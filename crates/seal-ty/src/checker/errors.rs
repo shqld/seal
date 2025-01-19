@@ -43,8 +43,6 @@ pub enum ErrorKind<'tcx> {
 	PropertyDoesNotExist(Ty<'tcx>, Atom),
 	/// TS(2351)
 	NotConstructable,
-	/// TS(2454)
-	UsedBeforeAssigned(Symbol),
 	/// TS(2554)
 	WrongNumArgs(usize, usize),
 	/// TS(2588)
@@ -115,7 +113,7 @@ impl Display for ErrorKind<'_> {
 				)
 			}
 			PropertyDoesNotExist(ty, key) => {
-				write!(f, "Property '{key}' does not exist on type '{ty}'.")
+				write!(f, "Property '{}' does not exist on type '{}'.", key, ty)
 			}
 			NotConstructable => {
 				write!(f, "This expression is not constructable.")
@@ -137,9 +135,6 @@ impl Display for ErrorKind<'_> {
 					f,
 					"This expression is not callable.\nType '{ty}' has no call signatures.",
 				)
-			}
-			UsedBeforeAssigned(name) => {
-				write!(f, "Variable '{name}' is used before being assigned.")
 			}
 		}
 	}
