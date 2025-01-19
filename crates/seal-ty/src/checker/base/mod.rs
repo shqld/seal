@@ -5,7 +5,7 @@ mod satisfies;
 mod stmt;
 mod ts_type;
 
-use std::{cell::RefCell, collections::HashMap, ops::Deref};
+use std::{cell::RefCell, collections::HashMap, fmt::Debug, ops::Deref};
 
 use crate::{
 	Ty,
@@ -21,12 +21,20 @@ struct Var<'tcx> {
 	is_assignable: bool,
 }
 
-#[derive(Debug)]
 pub struct BaseChecker<'tcx> {
 	pub tcx: &'tcx TyContext<'tcx>,
 	pub constants: TyConstants<'tcx>,
 	vars: RefCell<HashMap<Symbol, Var<'tcx>>>,
 	pub errors: RefCell<Vec<Error<'tcx>>>,
+}
+
+impl Debug for BaseChecker<'_> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("BaseChecker")
+			.field("vars", &self.vars.borrow())
+			.field("errors", &self.errors.borrow())
+			.finish()
+	}
 }
 
 impl<'tcx> BaseChecker<'tcx> {

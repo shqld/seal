@@ -1,6 +1,6 @@
 use std::{
 	collections::{BTreeMap, BTreeSet},
-	fmt::Display,
+	fmt::{Debug, Display},
 	hash::Hash,
 	ops::Deref,
 	rc::Rc,
@@ -10,7 +10,7 @@ use swc_atoms::Atom;
 
 use crate::{Ty, symbol::Symbol};
 
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Hash, PartialEq, Eq)]
 pub enum TyKind<'tcx> {
 	// value types
 	Void,
@@ -30,6 +30,12 @@ pub enum TyKind<'tcx> {
 	Lazy,
 	Never,
 	Guard(Symbol, Ty<'tcx>),
+}
+
+impl Debug for TyKind<'_> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		Display::fmt(self, f)
+	}
 }
 
 impl Display for TyKind<'_> {

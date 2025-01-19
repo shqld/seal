@@ -1,5 +1,6 @@
 use std::{
 	collections::{BTreeMap, BTreeSet, HashMap},
+	fmt::Debug,
 	rc::Rc,
 };
 
@@ -13,9 +14,14 @@ use crate::{
 	symbol::Symbol,
 };
 
-#[derive(Debug)]
 pub struct TyContext<'tcx> {
 	interner: Interner<'tcx, TyKind<'tcx>>,
+}
+
+impl Debug for TyContext<'_> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("TyContext").finish()
+	}
 }
 
 impl TyContext<'_> {

@@ -1,11 +1,17 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use swc_atoms::Atom;
 use swc_common::SyntaxContext;
 use swc_ecma_ast::Id;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Symbol(Id);
+
+impl Debug for Symbol {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "Symbol({}#{})", self.0.0, self.0.1.as_u32())
+	}
+}
 
 impl Display for Symbol {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
