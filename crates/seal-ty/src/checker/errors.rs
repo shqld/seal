@@ -56,6 +56,8 @@ pub enum ErrorKind<'tcx> {
 
 	/// TS(2367)
 	NoOverlap(Ty<'tcx>, Ty<'tcx>),
+	/// TS(1196)
+	CatchParameterCannotHaveTypeAnnotation,
 }
 
 impl Display for ErrorKind<'_> {
@@ -140,6 +142,9 @@ impl Display for ErrorKind<'_> {
 			}
 			UsedBeforeAssigned(name) => {
 				write!(f, "Variable '{name}' is used before being assigned.")
+			}
+			CatchParameterCannotHaveTypeAnnotation => {
+				write!(f, "Catch clause parameter cannot have a type annotation.")
 			}
 		}
 	}

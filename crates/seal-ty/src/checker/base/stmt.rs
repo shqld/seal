@@ -161,9 +161,24 @@ impl BaseChecker<'_> {
 					let checker = self.new_scoped_checker();
 					
 					// Check catch parameter if it exists
-					if let Some(_param) = &handler.param {
-						// In TypeScript, catch parameter is usually 'any' or 'unknown'
-						// For now, we'll skip detailed parameter checking
+					if let Some(param) = &handler.param {
+						match param {
+							swc_ecma_ast::Pat::Ident(ident) => {
+								// Check if there's a type annotation - this should be an error
+								if ident.type_ann.is_some() {
+									self.add_error(crate::checker::errors::ErrorKind::CatchParameterCannotHaveTypeAnnotation);
+								}
+								
+								// Always bind the catch parameter as unknown type
+								let name = crate::symbol::Symbol::new(ident.to_id());
+								let catch_value = checker.add_local(self.constants.unknown, crate::sir::Value::Param);
+								checker.set_binding(&name, Some(catch_value), self.constants.unknown, false);
+							}
+							_ => {
+								// Other pattern types (destructuring, etc.) are not commonly used in catch
+								// For now, we'll skip detailed handling
+							}
+						}
 					}
 					
 					// Check catch body

@@ -959,3 +959,58 @@ pass!(
         throwError satisfies () => void;
     "#
 );
+
+// Catch parameter tests
+pass!(
+	catch_parameter_unknown_,
+	r#"
+        try {
+            let x = 42;
+        } catch (e) {
+            e satisfies unknown;
+        }
+    "#
+);
+
+fail!(
+	catch_parameter_with_type_annotation_,
+	r#"
+        try {
+            let x = 42;
+        } catch (e: string) {
+            let error = e;
+        }
+    "#,
+	&["Catch clause parameter cannot have a type annotation."]
+);
+
+pass!(
+	catch_parameter_usage_,
+	r#"
+        try {
+            throw "error";
+        } catch (error) {
+            let msg = error;
+            msg satisfies unknown;
+        }
+    "#
+);
+
+// Unknown type tests
+pass!(
+	unknown_type_basic_,
+	r#"
+        let x: unknown = 42;
+        x satisfies unknown;
+    "#
+);
+
+pass!(
+	unknown_accepts_anything_,
+	r#"
+        let x: unknown = "hello";
+        let y: unknown = 42;
+        let z: unknown = true;
+        let obj: unknown = { a: 1 };
+    "#
+);

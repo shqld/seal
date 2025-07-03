@@ -33,6 +33,7 @@ pub enum TyKind<'tcx> {
 	Err,
 	Lazy,
 	Never,
+	Unknown,
 	Guard(Symbol, Ty<'tcx>),
 }
 
@@ -110,6 +111,7 @@ impl Display for TyKind<'_> {
 			TyKind::Err => write!(f, "<err>"),
 			TyKind::Lazy => write!(f, "<lazy>",),
 			TyKind::Never => write!(f, "<never>",),
+			TyKind::Unknown => write!(f, "unknown"),
 			TyKind::Guard(_, _) => write!(f, "<guard>"),
 		}
 	}
