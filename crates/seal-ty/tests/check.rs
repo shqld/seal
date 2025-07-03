@@ -875,3 +875,87 @@ pass!(
         }
     "#
 );
+
+// Switch statement tests
+pass!(
+	switch_basic_,
+	r#"
+        let x = 1;
+        switch (x) {
+            case 1:
+                let a = "one";
+                break;
+            case 2:
+                let b = "two";
+                break;
+            default:
+                let c = "other";
+        }
+    "#
+);
+
+pass!(
+	switch_string_,
+	r#"
+        let status = "pending";
+        switch (status) {
+            case "pending":
+                let message = "Waiting...";
+                break;
+            case "complete":
+                let result = "Done!";
+                break;
+        }
+    "#
+);
+
+// Try-catch-finally tests
+pass!(
+	try_catch_basic_,
+	r#"
+        try {
+            let x = 42;
+            x satisfies number;
+        } catch (e) {
+            let error = "Error occurred";
+            error satisfies string;
+        }
+    "#
+);
+
+pass!(
+	try_catch_finally_,
+	r#"
+        try {
+            let x = 42;
+        } catch (e) {
+            let error = "Error";
+        } finally {
+            let cleanup = true;
+            cleanup satisfies boolean;
+        }
+    "#
+);
+
+// Throw statement tests
+pass!(
+	throw_statement_,
+	r#"
+        function throwError() {
+            throw "An error occurred";
+        }
+        
+        throwError satisfies () => void;
+    "#
+);
+
+pass!(
+	throw_object_,
+	r#"
+        function throwError() {
+            throw { message: "Error", code: 500 };
+        }
+        
+        throwError satisfies () => void;
+    "#
+);

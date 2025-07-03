@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use swc_ecma_ast::{BreakStmt, ContinueStmt, DoWhileStmt, ExprStmt, ForStmt, IfStmt, Stmt, WhileStmt};
+use swc_ecma_ast::{BreakStmt, ContinueStmt, DoWhileStmt, ExprStmt, ForStmt, IfStmt, Stmt, SwitchStmt, ThrowStmt, TryStmt, WhileStmt};
 
 use crate::TyKind;
 
@@ -125,6 +125,59 @@ impl BaseChecker<'_> {
 			}
 			Stmt::Continue(ContinueStmt { .. }) => {
 				// Continue statement - no type checking needed
+			}
+			Stmt::Switch(SwitchStmt { discriminant, cases, .. }) => {
+				// Check discriminant expression
+				let _discriminant_value = self.check_expr(discriminant);
+				
+				// Check each case
+				for case in cases {
+					let checker = self.new_scoped_checker();
+					
+					// Check case test expression if it exists
+					if let Some(test) = &case.test {
+						checker.check_expr(test);
+					}
+					
+					// Check case body
+					for stmt in &case.cons {
+						checker.check_stmt(stmt);
+					}
+				}
+			}
+			Stmt::Throw(ThrowStmt { arg, .. }) => {
+				// Check the thrown expression
+				self.check_expr(arg);
+			}
+			Stmt::Try(try_stmt) => {
+				let TryStmt { block, handler, finalizer, .. } = try_stmt.as_ref();
+				// Check try block
+				for stmt in &block.stmts {
+					self.check_stmt(stmt);
+				}
+				
+				// Check catch handler if it exists
+				if let Some(handler) = handler {
+					let checker = self.new_scoped_checker();
+					
+					// Check catch parameter if it exists
+					if let Some(_param) = &handler.param {
+						// In TypeScript, catch parameter is usually 'any' or 'unknown'
+						// For now, we'll skip detailed parameter checking
+					}
+					
+					// Check catch body
+					for stmt in &handler.body.stmts {
+						checker.check_stmt(stmt);
+					}
+				}
+				
+				// Check finally block if it exists
+				if let Some(finalizer) = finalizer {
+					for stmt in &finalizer.stmts {
+						self.check_stmt(stmt);
+					}
+				}
 			}
 			_ => todo!("{:#?}", stmt),
 		}
