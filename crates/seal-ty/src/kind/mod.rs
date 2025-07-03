@@ -21,9 +21,13 @@ pub enum TyKind<'tcx> {
 	Function(Function<'tcx>),
 	Class(Class<'tcx>),
 	Interface(Rc<Interface<'tcx>>),
+	Array(Array<'tcx>),
+	Tuple(Tuple<'tcx>),
 
 	// special types
 	Union(Union<'tcx>),
+	Generic(Generic<'tcx>),
+	TypeParameter(TypeParameter),
 
 	// internal checker types (users cannot create)
 	Err,
@@ -76,6 +80,33 @@ impl Display for TyKind<'_> {
 					.collect::<Vec<_>>()
 					.join(" | ")
 			),
+			TyKind::Array(Array { element }) => write!(f, "{}[]", element),
+			TyKind::Tuple(Tuple { elements }) => write!(
+				f,
+				"[{}]",
+				elements
+					.iter()
+					.map(|ty| ty.to_string())
+					.collect::<Vec<_>>()
+					.join(", ")
+			),
+			TyKind::Generic(Generic { name, type_args }) => {
+				if type_args.is_empty() {
+					write!(f, "{}", name)
+				} else {
+					write!(
+						f,
+						"{}<{}>",
+						name,
+						type_args
+							.iter()
+							.map(|ty| ty.to_string())
+							.collect::<Vec<_>>()
+							.join(", ")
+					)
+				}
+			}
+			TyKind::TypeParameter(TypeParameter { name, .. }) => write!(f, "{}", name),
 			TyKind::Err => write!(f, "<err>"),
 			TyKind::Lazy => write!(f, "<lazy>",),
 			TyKind::Never => write!(f, "<never>",),
@@ -198,5 +229,60 @@ impl<'tcx> Interface<'tcx> {
 
 	pub fn get_prop(&self, key: &Atom) -> Option<Ty<'tcx>> {
 		self.fields.get(key).copied()
+	}
+}
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct Array<'tcx> {
+	pub element: Ty<'tcx>,
+}
+
+impl<'tcx> Array<'tcx> {
+	pub fn new(element: Ty<'tcx>) -> Self {
+		Self { element }
+	}
+}
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct Tuple<'tcx> {
+	pub elements: Vec<Ty<'tcx>>,
+}
+
+impl<'tcx> Tuple<'tcx> {
+	pub fn new(elements: Vec<Ty<'tcx>>) -> Self {
+		Self { elements }
+	}
+}
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct Generic<'tcx> {
+	pub name: Symbol,
+	pub type_args: Vec<Ty<'tcx>>,
+}
+
+impl<'tcx> Generic<'tcx> {
+	pub fn new(name: Symbol, type_args: Vec<Ty<'tcx>>) -> Self {
+		Self { name, type_args }
+	}
+}
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct TypeParameter {
+	pub name: Symbol,
+	pub constraint: Option<Box<TyKind<'static>>>,
+	pub default: Option<Box<TyKind<'static>>>,
+}
+
+impl TypeParameter {
+	pub fn new(
+		name: Symbol,
+		constraint: Option<Box<TyKind<'static>>>,
+		default: Option<Box<TyKind<'static>>>,
+	) -> Self {
+		Self {
+			name,
+			constraint,
+			default,
+		}
 	}
 }
