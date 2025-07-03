@@ -1,6 +1,6 @@
 use std::{
 	cell::{Cell, RefCell},
-	collections::{BTreeSet, HashMap},
+	collections::{BTreeMap, BTreeSet, HashMap},
 	fmt::Debug,
 	rc::Rc,
 };
@@ -135,8 +135,11 @@ impl<'tcx> TyConstants<'tcx> {
 		let never = tcx.new_ty(TyKind::Never);
 		let lazy = tcx.new_ty(TyKind::Lazy);
 
-		// TODO: placeholder
-		let object = tcx.new_ty(TyKind::Err);
+		// Object type - represents the base Object type in JavaScript/TypeScript
+		let object = tcx.new_interface(Rc::new(Interface::new(
+			Symbol::new((Atom::new("Object"), SyntaxContext::empty())),
+			BTreeMap::new(), // Base Object has no specific properties
+		)));
 		
 		// RegExp is represented as an interface
 		let regexp = tcx.new_interface(Rc::new(Interface::new(

@@ -10,8 +10,10 @@ impl<'tcx> BaseChecker<'tcx> {
 		match (expected.kind(), actual.kind()) {
 			// to prevent cascading errors
 			(Err, _) | (_, Err) => true,
-			// anything cannot satisfy never even never itself
-			(Never, _) | (_, Never) => false,
+			// never type is the bottom type - nothing can be assigned to it except never itself
+			(Never, Never) => true,
+			(Never, _) => false,
+			(_, Never) => true, // never can be assigned to anything
 			// Lazy types must be replaced with their actual types before checking
 			(Lazy, _) | (_, Lazy) => panic!("Lazy types must not be present in satisfies"),
 			// any guard can satisfy 'boolean', not vice versa
