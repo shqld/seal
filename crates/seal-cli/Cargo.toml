@@ -1,0 +1,12 @@
+[package]
+name = "seal-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "seal"
+path = "src/main.rs"
+
+[dependencies]
+seal-ty = { path = "../seal-ty" }
+clap = { version = "4.5", features = ["derive"] }
