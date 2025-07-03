@@ -34,6 +34,7 @@ pub enum TyKind<'tcx> {
 	Lazy,
 	Never,
 	Unknown,
+	Null,
 	Guard(Symbol, Ty<'tcx>),
 }
 
@@ -110,8 +111,9 @@ impl Display for TyKind<'_> {
 			TyKind::TypeParameter(TypeParameter { name, .. }) => write!(f, "{}", name),
 			TyKind::Err => write!(f, "<err>"),
 			TyKind::Lazy => write!(f, "<lazy>",),
-			TyKind::Never => write!(f, "<never>",),
+			TyKind::Never => write!(f, "never",),
 			TyKind::Unknown => write!(f, "unknown"),
+			TyKind::Null => write!(f, "null"),
 			TyKind::Guard(_, _) => write!(f, "<guard>"),
 		}
 	}

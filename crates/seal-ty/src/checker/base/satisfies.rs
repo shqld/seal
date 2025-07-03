@@ -16,6 +16,8 @@ impl<'tcx> BaseChecker<'tcx> {
 			(_, Never) => true, // never can be assigned to anything
 			// unknown type is the top type - anything can be assigned to it
 			(Unknown, _) => true,
+			// null type is distinct
+			(Null, Null) => true,
 			// Lazy types must be replaced with their actual types before checking
 			(Lazy, _) | (_, Lazy) => panic!("Lazy types must not be present in satisfies"),
 			// any guard can satisfy 'boolean', not vice versa

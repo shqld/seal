@@ -1014,3 +1014,703 @@ pass!(
         let obj: unknown = { a: 1 };
     "#
 );
+
+fail!(
+	unknown_assignment_restriction_,
+	r#"
+        let x: unknown = 42;
+        let y: number = x;
+    "#,
+	&["Type 'unknown' is not assignable to type 'number'."]
+);
+
+// Array type comprehensive tests
+pass!(
+	array_type_annotation_,
+	r#"
+        let arr: number[] = [1, 2, 3];
+        arr satisfies number[];
+    "#
+);
+
+pass!(
+	array_empty_with_annotation_,
+	r#"
+        let arr: string[] = [];
+        arr satisfies string[];
+    "#
+);
+
+fail!(
+	array_type_mismatch_,
+	r#"
+        let arr: number[] = ["hello", "world"];
+    "#,
+	&["Type 'string[]' is not assignable to type 'number[]'."]
+);
+
+pass!(
+	array_mixed_compatible_union_,
+	r#"
+        let arr: (number | string)[] = [1, "hello", 2, "world"];
+        arr satisfies (number | string)[];
+    "#
+);
+
+fail!(
+	array_element_access_bounds_,
+	r#"
+        let arr = [1, 2, 3];
+        let invalid: string = arr[0];
+    "#,
+	&["Type 'number' is not assignable to type 'string'."]
+);
+
+pass!(
+	array_method_access_,
+	r#"
+        let arr = [1, 2, 3];
+        // Note: Array methods would need to be implemented in the type system
+        // For now, just test basic array property access
+    "#
+);
+
+// Nested array tests
+pass!(
+	nested_array_2d_,
+	r#"
+        let matrix: number[][] = [[1, 2], [3, 4], [5, 6]];
+        matrix satisfies number[][];
+    "#
+);
+
+pass!(
+	nested_array_3d_,
+	r#"
+        let cube: number[][][] = [[[1, 2]], [[3, 4]]];
+        cube satisfies number[][][];
+    "#
+);
+
+// Union type comprehensive tests
+pass!(
+	union_three_types_,
+	r#"
+        let value: number | string | boolean = 42;
+        value = "hello";
+        value = true;
+    "#
+);
+
+pass!(
+	union_with_null_undefined_,
+	r#"
+        let value: string | null = "hello";
+        // Note: null and undefined types would need to be implemented
+    "#
+);
+
+fail!(
+	union_assignment_invalid_,
+	r#"
+        let value: number | string = true;
+    "#,
+	&["Type 'boolean' is not assignable to type 'number | string'."]
+);
+
+// Function type comprehensive tests
+pass!(
+	function_complex_signature_,
+	r#"
+        function process(
+            x: number,
+            y: string,
+            callback: (result: number) => string
+        ): boolean {
+            return true;
+        }
+        
+        process satisfies (x: number, y: string, callback: (result: number) => string) => boolean;
+    "#
+);
+
+pass!(
+	arrow_function_complex_,
+	r#"
+        let handler = (event: string, data: number): boolean => {
+            return true;
+        };
+        
+        handler satisfies (event: string, data: number) => boolean;
+    "#
+);
+
+fail!(
+	function_parameter_count_mismatch_,
+	r#"
+        function add(a: number, b: number): number {
+            return a + b;
+        }
+        
+        add satisfies (x: number) => number;
+    "#,
+	&["Type '(a: number, b: number) => number' is not assignable to type '(x: number) => number'."]
+);
+
+fail!(
+	function_return_type_mismatch_,
+	r#"
+        function getString(): string {
+            return "hello";
+        }
+        
+        getString satisfies () => number;
+    "#,
+	&["Type '() => string' is not assignable to type '() => number'."]
+);
+
+// Object type comprehensive tests
+pass!(
+	object_nested_properties_,
+	r#"
+        let user: { 
+            name: string, 
+            details: { 
+                age: number, 
+                email: string 
+            } 
+        } = {
+            name: "Alice",
+            details: {
+                age: 30,
+                email: "alice@example.com"
+            }
+        };
+        
+        user.details.age satisfies number;
+        user.details.email satisfies string;
+    "#
+);
+
+pass!(
+	object_method_definition_,
+	r#"
+        let calculator: {
+            add: (x: number, y: number) => number,
+            multiply: (x: number, y: number) => number
+        } = {
+            add: (x: number, y: number) => x + y,
+            multiply: (x: number, y: number) => x * y
+        };
+        
+        calculator.add satisfies (x: number, y: number) => number;
+    "#
+);
+
+fail!(
+	object_missing_property_,
+	r#"
+        let user: { name: string, age: number } = { name: "Alice" };
+    "#,
+	&["Type '{name: \"Alice\"}' is not assignable to type '{name: string, age: number}'."]
+);
+
+fail!(
+	object_extra_property_,
+	r#"
+        let user: { name: string } = { name: "Alice", age: 30 };
+    "#,
+	&["Type '{name: \"Alice\", age: 30}' is not assignable to type '{name: string}'."]
+);
+
+// Class comprehensive tests
+pass!(
+	class_inheritance_basic_,
+	r#"
+        class Animal {
+            name: string;
+            constructor(name: string) {
+                this.name = name;
+            }
+        }
+        
+        class Dog extends Animal {
+            breed: string;
+            constructor(name: string, breed: string) {
+                super(name);
+                this.breed = breed;
+            }
+        }
+        
+        let dog = new Dog("Buddy", "Golden Retriever");
+        dog satisfies Dog;
+        dog.name satisfies string;
+        dog.breed satisfies string;
+    "#
+);
+
+pass!(
+	class_method_overriding_,
+	r#"
+        class Shape {
+            getArea(): number {
+                return 0;
+            }
+        }
+        
+        class Rectangle extends Shape {
+            width: number;
+            height: number;
+            
+            constructor(width: number, height: number) {
+                super();
+                this.width = width;
+                this.height = height;
+            }
+            
+            getArea(): number {
+                return this.width * this.height;
+            }
+        }
+        
+        let rect = new Rectangle(10, 20);
+        rect.getArea satisfies () => number;
+    "#
+);
+
+fail!(
+	class_private_property_access_,
+	r#"
+        class BankAccount {
+            private balance: number;
+            
+            constructor(initialBalance: number) {
+                this.balance = initialBalance;
+            }
+        }
+        
+        let account = new BankAccount(1000);
+        account.balance;
+    "#,
+	&["Property 'balance' is private and only accessible within class 'BankAccount'."]
+);
+
+// Control flow comprehensive tests
+pass!(
+	nested_if_statements_,
+	r#"
+        let x: number | string | boolean = 42;
+        
+        if (typeof x === 'number') {
+            if (x > 0) {
+                x satisfies number;
+            } else {
+                x satisfies number;
+            }
+        } else if (typeof x === 'string') {
+            x satisfies string;
+        } else {
+            x satisfies boolean;
+        }
+    "#
+);
+
+pass!(
+	complex_boolean_expressions_,
+	r#"
+        let a = true;
+        let b = false;
+        let c = true;
+        
+        if (a && b || c) {
+            let result = "condition met";
+        }
+        
+        if ((a || b) && c) {
+            let result = "complex condition";
+        }
+    "#
+);
+
+// Loop comprehensive tests
+pass!(
+	for_loop_with_complex_init_,
+	r#"
+        for (let i = 0, j = 10; i < j; i = i + 1, j = j - 1) {
+            let sum = i + j;
+            sum satisfies number;
+        }
+    "#
+);
+
+pass!(
+	nested_loops_,
+	r#"
+        for (let i = 0; i < 3; i = i + 1) {
+            for (let j = 0; j < 3; j = j + 1) {
+                let product = i * j;
+                product satisfies number;
+            }
+        }
+    "#
+);
+
+pass!(
+	while_loop_with_break_continue_,
+	r#"
+        let count = 0;
+        while (count < 10) {
+            if (count === 5) {
+                count = count + 1;
+                continue;
+            }
+            if (count === 8) {
+                break;
+            }
+            count = count + 1;
+        }
+    "#
+);
+
+// Binary operators comprehensive tests
+pass!(
+	arithmetic_operators_,
+	r#"
+        let a = 10;
+        let b = 3;
+        
+        let sum = a + b;
+        let diff = a - b;
+        let product = a * b;
+        let quotient = a / b;
+        
+        sum satisfies number;
+        diff satisfies number;
+        product satisfies number;
+        quotient satisfies number;
+    "#
+);
+
+pass!(
+	comparison_operators_,
+	r#"
+        let x = 5;
+        let y = 10;
+        
+        let eq = x === y;
+        let neq = x !== y;
+        let lt = x < y;
+        let lte = x <= y;
+        let gt = x > y;
+        let gte = x >= y;
+        
+        eq satisfies boolean;
+        neq satisfies boolean;
+        lt satisfies boolean;
+        lte satisfies boolean;
+        gt satisfies boolean;
+        gte satisfies boolean;
+    "#
+);
+
+pass!(
+	logical_operators_,
+	r#"
+        let a = true;
+        let b = false;
+        
+        let and = a && b;
+        let or = a || b;
+        let notA = !a;
+        
+        and satisfies boolean;
+        or satisfies boolean;
+        notA satisfies boolean;
+    "#
+);
+
+fail!(
+	binary_operator_type_mismatch_,
+	r#"
+        let num = 5;
+        let str = "hello";
+        let result = num + str;
+    "#,
+	&["Operator '+' cannot be applied to types 'number' and 'string'."]
+);
+
+// String operations comprehensive tests
+pass!(
+	string_concatenation_,
+	r#"
+        let greeting = "Hello";
+        let space = " ";
+        let name = "World";
+        let message = greeting + space;
+        let fullMessage = message + name;
+        fullMessage satisfies string;
+    "#
+);
+
+pass!(
+	string_template_complex_,
+	r#"
+        let user = "Alice";
+        let age = 30;
+        let active = true;
+        let profile = `User: ${user}, Age: ${age}, Active: ${active}`;
+        profile satisfies string;
+    "#
+);
+
+// Template literal comprehensive tests
+pass!(
+	template_literal_multiline_,
+	r#"
+        let html = `
+            <div>
+                <h1>Title</h1>
+                <p>Content</p>
+            </div>
+        `;
+        html satisfies string;
+    "#
+);
+
+pass!(
+	template_literal_nested_expressions_,
+	r#"
+        let x = 5;
+        let y = 10;
+        let result = `The sum of ${x} and ${y} is ${x + y}`;
+        result satisfies string;
+    "#
+);
+
+// Regular expression comprehensive tests
+pass!(
+	regex_complex_patterns_,
+	r#"
+        let emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        let phonePattern = /^\+?[\d\s\-\(\)]+$/;
+        let urlPattern = /https?:\/\/[^\s]+/gi;
+        
+        emailPattern satisfies RegExp;
+        phonePattern satisfies RegExp;
+        urlPattern satisfies RegExp;
+    "#
+);
+
+// Error handling comprehensive tests
+pass!(
+	try_catch_nested_,
+	r#"
+        try {
+            try {
+                let x = 42;
+                throw "inner error";
+            } catch (innerError) {
+                innerError satisfies unknown;
+                throw "outer error";
+            }
+        } catch (outerError) {
+            outerError satisfies unknown;
+        }
+    "#
+);
+
+pass!(
+	try_catch_finally_complex_,
+	r#"
+        let resource = "acquired";
+        try {
+            let data = "processing";
+            throw data;
+        } catch (error) {
+            error satisfies unknown;
+            let errorMessage = "handled";
+        } finally {
+            resource = "released";
+        }
+    "#
+);
+
+// Switch statement comprehensive tests
+pass!(
+	switch_with_fallthrough_,
+	r#"
+        let grade = "A";
+        switch (grade) {
+            case "A":
+            case "B":
+                let message = "Good job";
+                break;
+            case "C":
+                let message2 = "Average";
+                break;
+            default:
+                let message3 = "Needs improvement";
+        }
+    "#
+);
+
+pass!(
+	switch_numeric_cases_,
+	r#"
+        let code = 200;
+        switch (code) {
+            case 200:
+                let success = "OK";
+                break;
+            case 404:
+                let notFound = "Not Found";
+                break;
+            case 500:
+                let serverError = "Internal Server Error";
+                break;
+            default:
+                let unknown = "Unknown status";
+        }
+    "#
+);
+
+// Never type comprehensive tests
+pass!(
+	never_type_in_exhaustive_switch_,
+	r#"
+        let value: "a" | "b" = "a";
+        switch (value) {
+            case "a":
+                let resultA = "A case";
+                break;
+            case "b":
+                let resultB = "B case";
+                break;
+            default:
+                // This should be never type
+                let exhaustive: never = value;
+        }
+    "#
+);
+
+fail!(
+	never_assignment_,
+	r#"
+        let impossible: never = 42;
+    "#,
+	&["Type 'number' is not assignable to type 'never'."]
+);
+
+// Function call comprehensive tests
+pass!(
+	function_higher_order_,
+	r#"
+        function map(arr: number[], fn: (x: number) => number): number[] {
+            return arr;
+        }
+        
+        function double(x: number): number {
+            return x * 2;
+        }
+        
+        let numbers = [1, 2, 3];
+        let doubled = map(numbers, double);
+        doubled satisfies number[];
+    "#
+);
+
+pass!(
+	function_closure_advanced_,
+	r#"
+        function createCounter(): () => number {
+            let count = 0;
+            return () => {
+                count = count + 1;
+                return count;
+            };
+        }
+        
+        let counter = createCounter();
+        counter satisfies () => number;
+        let value = counter();
+        value satisfies number;
+    "#
+);
+
+// Type narrowing comprehensive tests
+pass!(
+	type_narrowing_multiple_guards_,
+	r#"
+        let value: number | string | boolean | null = "hello";
+        
+        if (typeof value === 'string') {
+            value satisfies string;
+        } else if (typeof value === 'number') {
+            value satisfies number;
+        } else if (typeof value === 'boolean') {
+            value satisfies boolean;
+        } else {
+            // value should be null here
+        }
+    "#
+);
+
+pass!(
+	type_narrowing_property_access_,
+	r#"
+        let obj: { type: "user", name: string } | { type: "admin", permissions: string[] } = 
+            { type: "user", name: "Alice" };
+        
+        if (obj.type === "user") {
+            obj.name satisfies string;
+        } else {
+            obj.permissions satisfies string[];
+        }
+    "#
+);
+
+// Edge cases and error scenarios
+fail!(
+	divide_by_zero_type_check_,
+	r#"
+        let zero = 0;
+        let result = 10 / zero;
+        result satisfies string;
+    "#,
+	&["Type 'number' is not assignable to type 'string'."]
+);
+
+pass!(
+	complex_expression_precedence_,
+	r#"
+        let a = 2;
+        let b = 3;
+        let c = 4;
+        let result = a + b * c;
+        result satisfies number;
+    "#
+);
+
+fail!(
+	invalid_property_chain_,
+	r#"
+        let obj = { a: { b: { c: 42 } } };
+        obj.a.b.d;
+    "#,
+	&["Property 'd' does not exist on type '{c: number}'."]
+);
+
+pass!(
+	boolean_type_guards_complex_,
+	r#"
+        let value: unknown = "test";
+        
+        if (typeof value === 'string' && value.length > 0) {
+            value satisfies string;
+        }
+        
+        if (typeof value === 'number' && value > 0) {
+            value satisfies number;
+        }
+    "#
+);

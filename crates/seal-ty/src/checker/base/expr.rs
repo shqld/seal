@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use swc_ecma_ast::{
 	AssignExpr, AssignTarget, BinExpr, BinaryOp, BlockStmtOrExpr, Bool, CallExpr, Callee, Expr,
 	ExprOrSpread, Lit, MemberExpr, MemberProp, NewExpr, Number, ObjectLit, Pat, Prop, PropOrSpread,
-	SimpleAssignTarget, Str, TsSatisfiesExpr, UnaryOp,
+	SeqExpr, SimpleAssignTarget, Str, TsSatisfiesExpr, UnaryOp,
 };
 
 use crate::{
@@ -110,6 +110,18 @@ impl<'tcx> BaseChecker<'tcx> {
 					UnaryOp::TypeOf => {
 						self.add_local(self.constants.type_of, Value::TypeOf(value.id))
 					}
+					UnaryOp::Bang => {
+						// Logical NOT operator - always returns boolean
+						self.add_local(self.constants.boolean, Value::Unary(crate::sir::UnaryOp::Not, value.id))
+					}
+					UnaryOp::Plus => {
+						// Unary plus - converts to number
+						self.add_local(self.constants.number, Value::Unary(crate::sir::UnaryOp::Plus, value.id))
+					}
+					UnaryOp::Minus => {
+						// Unary minus - converts to number  
+						self.add_local(self.constants.number, Value::Unary(crate::sir::UnaryOp::Minus, value.id))
+					}
 					_ => todo!("{:#?}", unary),
 				}
 			}
@@ -139,102 +151,133 @@ impl<'tcx> BaseChecker<'tcx> {
 					}
 					// Arithmetic operators
 					BinaryOp::Add => {
-						// For now, assume number + number = number, string + string = string
 						match (left.ty.kind(), right.ty.kind()) {
-							(TyKind::Number, TyKind::Number) => self.add_local(self.constants.number, Value::Int(0)),
-							(TyKind::String(_), TyKind::String(_)) => self.add_local(self.constants.string, Value::Str(swc_atoms::Atom::new(""))),
+							(TyKind::Number, TyKind::Number) => {
+								self.add_local(self.constants.number, Value::Binary(crate::sir::BinaryOp::Add, left.id, right.id))
+							}
+							(TyKind::String(_), TyKind::String(_)) => {
+								self.add_local(self.constants.string, Value::Binary(crate::sir::BinaryOp::Add, left.id, right.id))
+							}
 							_ => {
-								// In TypeScript, + is overloaded for numbers and strings
+								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::Add, left.ty, right.ty));
 								self.add_local(self.constants.err, Value::Err)
 							}
 						}
 					}
-					BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div => {
-						// These only work with numbers
+					BinaryOp::Sub => {
 						match (left.ty.kind(), right.ty.kind()) {
-							(TyKind::Number, TyKind::Number) => self.add_local(self.constants.number, Value::Int(0)),
-							_ => self.add_local(self.constants.err, Value::Err)
+							(TyKind::Number, TyKind::Number) => {
+								self.add_local(self.constants.number, Value::Binary(crate::sir::BinaryOp::Sub, left.id, right.id))
+							}
+							_ => {
+								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::Sub, left.ty, right.ty));
+								self.add_local(self.constants.err, Value::Err)
+							}
+						}
+					}
+					BinaryOp::Mul => {
+						match (left.ty.kind(), right.ty.kind()) {
+							(TyKind::Number, TyKind::Number) => {
+								self.add_local(self.constants.number, Value::Binary(crate::sir::BinaryOp::Mul, left.id, right.id))
+							}
+							_ => {
+								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::Mul, left.ty, right.ty));
+								self.add_local(self.constants.err, Value::Err)
+							}
+						}
+					}
+					BinaryOp::Div => {
+						match (left.ty.kind(), right.ty.kind()) {
+							(TyKind::Number, TyKind::Number) => {
+								self.add_local(self.constants.number, Value::Binary(crate::sir::BinaryOp::Div, left.id, right.id))
+							}
+							_ => {
+								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::Div, left.ty, right.ty));
+								self.add_local(self.constants.err, Value::Err)
+							}
 						}
 					}
 					// Comparison operators
-					BinaryOp::Lt | BinaryOp::LtEq | BinaryOp::Gt | BinaryOp::GtEq => {
-						// These work with numbers and strings
+					BinaryOp::Lt => {
 						match (left.ty.kind(), right.ty.kind()) {
-							(TyKind::Number, TyKind::Number) | (TyKind::String(_), TyKind::String(_)) => {
-								self.add_local(self.constants.boolean, Value::Bool(false))
+							(TyKind::Number, TyKind::Number) => {
+								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::Lt, left.id, right.id))
 							}
-							_ => self.add_local(self.constants.err, Value::Err)
+							(TyKind::String(_), TyKind::String(_)) => {
+								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::Lt, left.id, right.id))
+							}
+							_ => {
+								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::Lt, left.ty, right.ty));
+								self.add_local(self.constants.err, Value::Err)
+							}
+						}
+					}
+					BinaryOp::LtEq => {
+						match (left.ty.kind(), right.ty.kind()) {
+							(TyKind::Number, TyKind::Number) => {
+								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::LtEq, left.id, right.id))
+							}
+							(TyKind::String(_), TyKind::String(_)) => {
+								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::LtEq, left.id, right.id))
+							}
+							_ => {
+								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::LtEq, left.ty, right.ty));
+								self.add_local(self.constants.err, Value::Err)
+							}
+						}
+					}
+					BinaryOp::Gt => {
+						match (left.ty.kind(), right.ty.kind()) {
+							(TyKind::Number, TyKind::Number) => {
+								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::Gt, left.id, right.id))
+							}
+							(TyKind::String(_), TyKind::String(_)) => {
+								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::Gt, left.id, right.id))
+							}
+							_ => {
+								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::Gt, left.ty, right.ty));
+								self.add_local(self.constants.err, Value::Err)
+							}
+						}
+					}
+					BinaryOp::GtEq => {
+						match (left.ty.kind(), right.ty.kind()) {
+							(TyKind::Number, TyKind::Number) => {
+								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::GtEq, left.id, right.id))
+							}
+							(TyKind::String(_), TyKind::String(_)) => {
+								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::GtEq, left.id, right.id))
+							}
+							_ => {
+								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::GtEq, left.ty, right.ty));
+								self.add_local(self.constants.err, Value::Err)
+							}
 						}
 					}
 					// Logical operators
-					BinaryOp::LogicalAnd | BinaryOp::LogicalOr => {
-						// Return the appropriate type based on TypeScript semantics
-						// For now, return boolean
-						self.add_local(self.constants.boolean, Value::Bool(false))
+					BinaryOp::LogicalAnd => {
+						self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::And, left.id, right.id))
+					}
+					BinaryOp::LogicalOr => {
+						self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::Or, left.id, right.id))
 					}
 					_ => todo!("{:#?}", op),
 				}
 			}
 			Expr::Member(MemberExpr { obj, prop, .. }) => {
-				let key = match &prop {
-					MemberProp::Ident(ident) => ident.sym.clone(),
-					_ => todo!("{:#?}", prop),
-				};
-
 				let obj = self.check_expr(obj);
-
-				match obj.ty.kind() {
-					TyKind::Object(obj_ty) => match obj_ty.get_prop(&key) {
-						Some(ty) => self.add_local(ty, Value::Member(obj.id, key)),
-						None => {
-							self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()));
-							self.add_local(self.constants.err, Value::Member(obj.id, key))
-						}
-					},
-					TyKind::Interface(interface) => match interface.fields().get(&key) {
-						Some(ty) => self.add_local(*ty, Value::Member(obj.id, key)),
-						None => {
-							self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()));
-							self.add_local(self.constants.err, Value::Member(obj.id, key))
-						}
-					},
-					TyKind::Union(uni) => {
-						let mut prop_arms = BTreeSet::new();
-
-						for arm in uni.arms() {
-							if let TyKind::Object(obj) = arm.kind() {
-								if let Some(prop) = obj.get_prop(&key) {
-									prop_arms.insert(prop);
-									continue;
-								}
-							}
-
-							self.add_error(ErrorKind::PropertyDoesNotExist(*arm, key.clone()));
-							return self.add_local(self.constants.err, Value::Member(obj.id, key));
-						}
-
-						self.add_local(self.tcx.new_union(prop_arms), Value::Member(obj.id, key))
+				
+				match &prop {
+					MemberProp::Ident(ident) => {
+						let key = ident.sym.clone();
+						self.handle_property_access(obj, key)
 					}
-					TyKind::Number | TyKind::String(_) => {
-						let proto = match obj.ty.kind() {
-							TyKind::Number => &self.constants.proto_number,
-							TyKind::String(_) => &self.constants.proto_string,
-							_ => unreachable!(),
-						};
-
-						let ty = proto.get(&key).copied().unwrap_or_else(|| {
-							self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()));
-							self.constants.err
-						});
-
-						self.add_local(ty, Value::Member(obj.id, key))
+					MemberProp::Computed(computed) => {
+						// Handle computed property access like arr[0] or obj["key"]
+						let index = self.check_expr(&computed.expr);
+						self.handle_computed_access(obj, index)
 					}
-					TyKind::Err => self.add_local(self.constants.err, Value::Member(obj.id, key)),
-					_ => {
-						// TODO: other error kind? (e.g. "Property access on non-object is not allowed.")
-						self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()));
-						self.add_local(self.constants.err, Value::Member(obj.id, key))
-					}
+					_ => todo!("{:#?}", prop),
 				}
 			}
 			Expr::Object(ObjectLit { props, .. }) => {
@@ -454,7 +497,115 @@ impl<'tcx> BaseChecker<'tcx> {
 					Value::Template(parts.into_iter().map(|p| p.id).collect()),
 				)
 			}
+			Expr::Seq(SeqExpr { exprs, .. }) => {
+				// Sequence expression (comma operator): evaluate all expressions, return the last one
+				let mut result = None;
+				for expr in exprs {
+					result = Some(self.check_expr(expr));
+				}
+				result.unwrap_or_else(|| self.add_local(self.constants.void, Value::Err))
+			}
 			_ => todo!("{:#?}", expr),
+		}
+	}
+
+	fn handle_property_access(&self, obj: crate::sir::Local<'tcx>, key: swc_atoms::Atom) -> crate::sir::Local<'tcx> {
+		match obj.ty.kind() {
+			TyKind::Object(obj_ty) => match obj_ty.get_prop(&key) {
+				Some(ty) => self.add_local(ty, Value::Member(obj.id, key)),
+				None => {
+					self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()));
+					self.add_local(self.constants.err, Value::Member(obj.id, key))
+				}
+			},
+			TyKind::Interface(interface) => match interface.fields().get(&key) {
+				Some(ty) => self.add_local(*ty, Value::Member(obj.id, key)),
+				None => {
+					self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()));
+					self.add_local(self.constants.err, Value::Member(obj.id, key))
+				}
+			},
+			TyKind::Union(uni) => {
+				let mut prop_arms = BTreeSet::new();
+
+				for arm in uni.arms() {
+					if let TyKind::Object(obj) = arm.kind() {
+						if let Some(prop) = obj.get_prop(&key) {
+							prop_arms.insert(prop);
+							continue;
+						}
+					}
+
+					self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()));
+					return self.add_local(self.constants.err, Value::Member(obj.id, key));
+				}
+
+				self.add_local(self.tcx.new_union(prop_arms), Value::Member(obj.id, key))
+			}
+			_ => {
+				// Check for primitive methods
+				let (name, props) = if let TyKind::Number = obj.ty.kind() {
+					("number", &self.constants.proto_number)
+				} else if let TyKind::String(_) = obj.ty.kind() {
+					("string", &self.constants.proto_string)
+				} else {
+					self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()));
+					return self.add_local(self.constants.err, Value::Member(obj.id, key));
+				};
+
+				if let Some(ty) = props.get(&key) {
+					self.add_local(*ty, Value::Member(obj.id, key))
+				} else {
+					self.add_error(ErrorKind::PropertyDoesNotExist(
+						match name {
+							"number" => self.constants.number,
+							"string" => self.constants.string,
+							_ => unreachable!(),
+						},
+						key.clone(),
+					));
+					self.add_local(self.constants.err, Value::Member(obj.id, key))
+				}
+			}
+		}
+	}
+
+	fn handle_computed_access(&self, obj: crate::sir::Local<'tcx>, index: crate::sir::Local<'tcx>) -> crate::sir::Local<'tcx> {
+		match obj.ty.kind() {
+			TyKind::Array(array) => {
+				// For arrays, index should be number and we return element type
+				match index.ty.kind() {
+					TyKind::Number => {
+						self.add_local(array.element, Value::Member(obj.id, swc_atoms::Atom::new("element")))
+					}
+					_ => {
+						self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, swc_atoms::Atom::new("element")));
+						self.add_local(self.constants.err, Value::Err)
+					}
+				}
+			}
+			TyKind::Object(_) => {
+				// For objects, index should be string
+				match index.ty.kind() {
+					TyKind::String(Some(key)) => {
+						// We know the exact key
+						self.handle_property_access(obj, key.clone())
+					}
+					TyKind::String(None) => {
+						// Dynamic string key - we can't statically determine the type
+						// In a more sophisticated implementation, we'd use index signatures
+						self.add_local(self.constants.unknown, Value::Member(obj.id, swc_atoms::Atom::new("computed")))
+					}
+					_ => {
+						self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, swc_atoms::Atom::new("computed")));
+						self.add_local(self.constants.err, Value::Err)
+					}
+				}
+			}
+			_ => {
+				self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, swc_atoms::Atom::new("computed")));
+				self.add_local(self.constants.err, Value::Err)
+			}
 		}
 	}
 }

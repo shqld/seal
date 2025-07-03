@@ -85,6 +85,29 @@ pub enum Value {
 	TypeOf(LocalId),
 	Closure(),
 	Member(LocalId, Atom),
+	Unary(UnaryOp, LocalId),
+	Binary(BinaryOp, LocalId, LocalId),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum UnaryOp {
+	Not,
+	Plus,
+	Minus,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BinaryOp {
+	Add,
+	Sub,
+	Mul,
+	Div,
+	Lt,
+	LtEq,
+	Gt,
+	GtEq,
+	And,
+	Or,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

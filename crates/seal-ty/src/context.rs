@@ -118,6 +118,7 @@ pub struct TyConstants<'tcx> {
 	pub never: Ty<'tcx>,
 	pub lazy: Ty<'tcx>,
 	pub unknown: Ty<'tcx>,
+	pub null: Ty<'tcx>,
 	pub object: Ty<'tcx>,
 	pub regexp: Ty<'tcx>,
 
@@ -137,6 +138,7 @@ impl<'tcx> TyConstants<'tcx> {
 		let never = tcx.new_ty(TyKind::Never);
 		let lazy = tcx.new_ty(TyKind::Lazy);
 		let unknown = tcx.new_ty(TyKind::Unknown);
+		let null = tcx.new_ty(TyKind::Null);
 
 		// Object type - represents the base Object type in JavaScript/TypeScript
 		let object = tcx.new_interface(Rc::new(Interface::new(
@@ -184,6 +186,7 @@ impl<'tcx> TyConstants<'tcx> {
 			never,
 			lazy,
 			unknown,
+			null,
 			object,
 			regexp,
 

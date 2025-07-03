@@ -58,6 +58,8 @@ pub enum ErrorKind<'tcx> {
 	NoOverlap(Ty<'tcx>, Ty<'tcx>),
 	/// TS(1196)
 	CatchParameterCannotHaveTypeAnnotation,
+	/// Custom error for binary operator type mismatch
+	BinaryOperatorTypeMismatch(swc_ecma_ast::BinaryOp, Ty<'tcx>, Ty<'tcx>),
 }
 
 impl Display for ErrorKind<'_> {
@@ -145,6 +147,20 @@ impl Display for ErrorKind<'_> {
 			}
 			CatchParameterCannotHaveTypeAnnotation => {
 				write!(f, "Catch clause parameter cannot have a type annotation.")
+			}
+			BinaryOperatorTypeMismatch(op, left, right) => {
+				let op_str = match op {
+					swc_ecma_ast::BinaryOp::Add => "+",
+					swc_ecma_ast::BinaryOp::Sub => "-",
+					swc_ecma_ast::BinaryOp::Mul => "*",
+					swc_ecma_ast::BinaryOp::Div => "/",
+					swc_ecma_ast::BinaryOp::Lt => "<",
+					swc_ecma_ast::BinaryOp::LtEq => "<=",
+					swc_ecma_ast::BinaryOp::Gt => ">",
+					swc_ecma_ast::BinaryOp::GtEq => ">=",
+					_ => "unknown",
+				};
+				write!(f, "Operator '{}' cannot be applied to types '{}' and '{}'.", op_str, left, right)
 			}
 		}
 	}
