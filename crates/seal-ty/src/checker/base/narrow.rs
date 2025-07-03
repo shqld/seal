@@ -27,10 +27,10 @@ impl<'tcx> BaseChecker<'tcx> {
 			) => {
 				if let Expr::Ident(ident) = arg.as_ref() {
 					let name = Symbol::new(ident.to_id());
-					let value_ty = self.check_expr(value);
+					let value = self.check_expr(value);
 
 					// TODO: seal should allow only const string for rhs of Eq(TypeOf) in Sir?
-					if let TyKind::String(Some(value)) = value_ty.kind() {
+					if let TyKind::String(Some(value)) = value.ty.kind() {
 						let narrowed_ty = match value.as_str() {
 							"boolean" => Some(self.constants.boolean),
 							"number" => Some(self.constants.number),
@@ -48,20 +48,19 @@ impl<'tcx> BaseChecker<'tcx> {
 			| (value, Expr::Member(MemberExpr { obj, prop, .. })) => {
 				if let Expr::Ident(ident) = obj.as_ref() {
 					let name = Symbol::new(ident.to_id());
-					let obj_ty = self.check_expr(obj);
-					let prop = &prop.as_ident().unwrap().sym;
+					let obj = self.check_expr(obj);
+					let key = &prop.as_ident().unwrap().sym;
 
-					if let TyKind::Union(uni) = obj_ty.kind() {
-						let value_ty = self.check_expr(value);
+					if let TyKind::Union(uni) = obj.ty.kind() {
+						let value = self.check_expr(value);
 
 						let narrowed_arms: BTreeSet<_> = uni
 							.arms()
 							.iter()
 							.filter_map(|&arm| {
 								if let TyKind::Object(obj) = arm.kind() {
-									obj.fields()
-										.get(prop)
-										.filter(|&&prop_ty| prop_ty == value_ty)
+									obj.get_prop(key)
+										.filter(|&prop_ty| prop_ty == value.ty)
 										.map(|_| arm)
 								} else {
 									None
