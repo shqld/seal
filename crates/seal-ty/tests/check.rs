@@ -622,7 +622,7 @@ fail!(
         n satisfies number;
         n(42) satisfies number;
     "#,
-	&["This expression is not callable.\nType 'number' has no call signatures."]
+	&["This expression is not callable.\n  Type 'number' has no call signatures."]
 );
 
 fail!(
@@ -1400,6 +1400,25 @@ fail!(
         let result = num + str;
     "#,
 	&["Operator '+' cannot be applied to types 'number' and 'string'."]
+);
+
+// Enhanced error message tests - showing improved formatting consistency
+fail!(
+	property_missing_in_object_,
+	r#"
+        function f(obj: { a: number, b: string }) {}
+        f({ b: "hello" });
+    "#,
+	&["Type '{b: \"hello\"}' is not assignable to type '{a: number, b: string}'."]
+);
+
+fail!(
+	function_argument_type_mismatch_,
+	r#"
+        function f(x: number): void {}
+        f("hello");
+    "#,
+	&["Type 'string' is not assignable to type 'number'."]
 );
 
 // String operations comprehensive tests
