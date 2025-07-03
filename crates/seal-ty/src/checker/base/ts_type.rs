@@ -82,12 +82,14 @@ impl<'tcx> BaseChecker<'tcx> {
 						_ => binding.ty,
 					}
 				} else {
-					// Handle built-in types like RegExp
-					if name.name() == "RegExp" {
-						self.constants.regexp
-					} else {
-						self.add_error(crate::checker::errors::ErrorKind::CannotFindName(name));
-						self.constants.err
+					// Handle built-in types
+					match name.name().as_ref() {
+						"Object" => self.constants.object,
+						"RegExp" => self.constants.regexp,
+						_ => {
+							self.add_error(crate::checker::errors::ErrorKind::CannotFindName(name));
+							self.constants.err
+						}
 					}
 				}
 			}

@@ -49,6 +49,9 @@ impl<'tcx> BaseChecker<'tcx> {
 
 			(Array(expected), Array(actual)) => self.satisfies(expected.element, actual.element),
 
+			// Object literal should satisfy Object type
+			(Interface(expected), Object(_)) if expected.name().name() == "Object" => true,
+
 			_ => expected == actual,
 		}
 	}

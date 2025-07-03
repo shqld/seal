@@ -56,6 +56,12 @@ impl<'tcx> BaseChecker<'tcx> {
 
 		// Register built-in types
 		checker.set_binding(
+			&Symbol::new((swc_atoms::Atom::new("Object"), swc_common::SyntaxContext::empty())),
+			None,
+			checker.constants.object,
+			false,
+		);
+		checker.set_binding(
 			&Symbol::new((swc_atoms::Atom::new("RegExp"), swc_common::SyntaxContext::empty())),
 			None,
 			checker.constants.regexp,

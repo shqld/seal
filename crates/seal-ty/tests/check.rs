@@ -805,3 +805,20 @@ pass!(
         re.multiline satisfies boolean;
     "#
 );
+
+// Object type tests
+pass!(
+	object_type_basic_,
+	r#"
+        let obj: Object = {};
+        obj satisfies Object;
+    "#
+);
+
+pass!(
+	object_type_with_properties_,
+	r#"
+        let obj: Object = { name: "test", value: 42 };
+        obj satisfies Object;
+    "#
+);

@@ -117,6 +117,7 @@ pub struct TyConstants<'tcx> {
 	pub void: Ty<'tcx>,
 	pub never: Ty<'tcx>,
 	pub lazy: Ty<'tcx>,
+	pub object: Ty<'tcx>,
 	pub regexp: Ty<'tcx>,
 
 	pub type_of: Ty<'tcx>,
@@ -180,6 +181,7 @@ impl<'tcx> TyConstants<'tcx> {
 			void,
 			never,
 			lazy,
+			object,
 			regexp,
 
 			type_of: tcx.new_union(
