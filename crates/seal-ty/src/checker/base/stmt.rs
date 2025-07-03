@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use swc_ecma_ast::{ExprStmt, IfStmt, Stmt};
+use swc_ecma_ast::{BreakStmt, ContinueStmt, DoWhileStmt, ExprStmt, ForStmt, IfStmt, Stmt, WhileStmt};
 
 use crate::TyKind;
 
@@ -78,6 +78,53 @@ impl BaseChecker<'_> {
 				for stmt in &block.stmts {
 					self.check_stmt(stmt);
 				}
+			}
+			Stmt::While(WhileStmt { test, body, .. }) => {
+				// Check test expression
+				self.check_expr(test);
+				
+				// Check body in new scope
+				let checker = self.new_scoped_checker();
+				checker.check_stmt(body);
+			}
+			Stmt::DoWhile(DoWhileStmt { test, body, .. }) => {
+				// Check body first (since it always executes at least once)
+				let checker = self.new_scoped_checker();
+				checker.check_stmt(body);
+				
+				// Then check test expression
+				self.check_expr(test);
+			}
+			Stmt::For(ForStmt { init, test, update, body, .. }) => {
+				// Create new scope for the entire for loop
+				let checker = self.new_scoped_checker();
+				
+				// Check init (variable declaration or expression)
+				if let Some(init) = init {
+					match init {
+						swc_ecma_ast::VarDeclOrExpr::VarDecl(decl) => checker.check_decl(&swc_ecma_ast::Decl::Var(decl.clone())),
+						swc_ecma_ast::VarDeclOrExpr::Expr(expr) => { checker.check_expr(&expr); }
+					}
+				}
+				
+				// Check test expression
+				if let Some(test) = test {
+					checker.check_expr(test);
+				}
+				
+				// Check update expression  
+				if let Some(update) = update {
+					checker.check_expr(update);
+				}
+				
+				// Check body
+				checker.check_stmt(body);
+			}
+			Stmt::Break(BreakStmt { .. }) => {
+				// Break statement - no type checking needed
+			}
+			Stmt::Continue(ContinueStmt { .. }) => {
+				// Continue statement - no type checking needed
 			}
 			_ => todo!("{:#?}", stmt),
 		}

@@ -137,6 +137,41 @@ impl<'tcx> BaseChecker<'tcx> {
 							self.add_local(self.constants.boolean, Value::Eq(left.id, right.id))
 						}
 					}
+					// Arithmetic operators
+					BinaryOp::Add => {
+						// For now, assume number + number = number, string + string = string
+						match (left.ty.kind(), right.ty.kind()) {
+							(TyKind::Number, TyKind::Number) => self.add_local(self.constants.number, Value::Int(0)),
+							(TyKind::String(_), TyKind::String(_)) => self.add_local(self.constants.string, Value::Str(swc_atoms::Atom::new(""))),
+							_ => {
+								// In TypeScript, + is overloaded for numbers and strings
+								self.add_local(self.constants.err, Value::Err)
+							}
+						}
+					}
+					BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div => {
+						// These only work with numbers
+						match (left.ty.kind(), right.ty.kind()) {
+							(TyKind::Number, TyKind::Number) => self.add_local(self.constants.number, Value::Int(0)),
+							_ => self.add_local(self.constants.err, Value::Err)
+						}
+					}
+					// Comparison operators
+					BinaryOp::Lt | BinaryOp::LtEq | BinaryOp::Gt | BinaryOp::GtEq => {
+						// These work with numbers and strings
+						match (left.ty.kind(), right.ty.kind()) {
+							(TyKind::Number, TyKind::Number) | (TyKind::String(_), TyKind::String(_)) => {
+								self.add_local(self.constants.boolean, Value::Bool(false))
+							}
+							_ => self.add_local(self.constants.err, Value::Err)
+						}
+					}
+					// Logical operators
+					BinaryOp::LogicalAnd | BinaryOp::LogicalOr => {
+						// Return the appropriate type based on TypeScript semantics
+						// For now, return boolean
+						self.add_local(self.constants.boolean, Value::Bool(false))
+					}
 					_ => todo!("{:#?}", op),
 				}
 			}

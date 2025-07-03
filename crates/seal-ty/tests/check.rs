@@ -822,3 +822,56 @@ pass!(
         obj satisfies Object;
     "#
 );
+
+// Loop statement tests
+pass!(
+	while_loop_basic_,
+	r#"
+        let i = 0;
+        while (true) {
+            i = 42;
+        }
+        i satisfies number;
+    "#
+);
+
+pass!(
+	do_while_loop_basic_,
+	r#"
+        let i = 0;
+        do {
+            i = i + 1;
+        } while (i < 10);
+        i satisfies number;
+    "#
+);
+
+pass!(
+	for_loop_basic_,
+	r#"
+        for (let i = 0; i < 10; i = i + 1) {
+            let x = i * 2;
+            x satisfies number;
+        }
+    "#
+);
+
+pass!(
+	for_loop_no_init_,
+	r#"
+        let i = 0;
+        for (; i < 10; i = i + 1) {
+            let x = i * 2;
+            x satisfies number;
+        }
+    "#
+);
+
+pass!(
+	for_loop_empty_,
+	r#"
+        for (;;) {
+            break;
+        }
+    "#
+);
