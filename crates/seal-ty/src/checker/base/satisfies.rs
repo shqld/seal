@@ -45,6 +45,8 @@ impl<'tcx> BaseChecker<'tcx> {
 			}),
 			(Union(expected), _) => expected.arms().iter().any(|ty| self.satisfies(*ty, actual)),
 
+			(Array(expected), Array(actual)) => self.satisfies(expected.element, actual.element),
+
 			_ => expected == actual,
 		}
 	}

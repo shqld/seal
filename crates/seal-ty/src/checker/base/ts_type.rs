@@ -75,13 +75,27 @@ impl<'tcx> BaseChecker<'tcx> {
 					TsEntityName::Ident(ident) => ident.to_id(),
 					TsEntityName::TsQualifiedName(_) => unimplemented!(),
 				});
-				let binding = self.get_binding(&name).unwrap();
-
-				match binding.ty.kind() {
-					TyKind::Class(class) => self.tcx.new_interface(class.interface()),
-					_ => binding.ty,
+				
+				if let Some(binding) = self.get_binding(&name) {
+					match binding.ty.kind() {
+						TyKind::Class(class) => self.tcx.new_interface(class.interface()),
+						_ => binding.ty,
+					}
+				} else {
+					// Handle built-in types like RegExp
+					if name.name() == "RegExp" {
+						self.constants.regexp
+					} else {
+						self.add_error(crate::checker::errors::ErrorKind::CannotFindName(name));
+						self.constants.err
+					}
 				}
 			}
+			TsType::TsArrayType(array) => {
+				let element = self.build_ts_type(&array.elem_type);
+				self.tcx.new_array(element)
+			}
+			TsType::TsParenthesizedType(paren) => self.build_ts_type(&paren.type_ann),
 			_ => todo!("{:#?}", tstype),
 		}
 	}

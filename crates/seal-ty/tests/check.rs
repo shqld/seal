@@ -715,3 +715,93 @@ fail!(
     "#,
 	&["Property 'foo' does not exist on type 'string'."]
 );
+
+// Array literal tests
+pass!(
+	array_literal_empty_,
+	r#"
+        let arr = [];
+        arr satisfies never[];
+    "#
+);
+
+pass!(
+	array_literal_homogeneous_,
+	r#"
+        let arr = [1, 2, 3];
+        arr satisfies number[];
+    "#
+);
+
+pass!(
+	array_literal_heterogeneous_,
+	r#"
+        let arr = [1, "hello", true];
+        arr satisfies (number | string | boolean)[];
+    "#
+);
+
+pass!(
+	array_literal_nested_,
+	r#"
+        let arr = [[1, 2], [3, 4]];
+        arr satisfies number[][];
+    "#
+);
+
+// Template literal tests
+pass!(
+	template_literal_simple_,
+	r#"
+        let str = `hello world`;
+        str satisfies string;
+    "#
+);
+
+pass!(
+	template_literal_with_interpolation_,
+	r#"
+        let name = "Alice";
+        let age = 30;
+        let message = `Hello, ${name}! You are ${age} years old.`;
+        message satisfies string;
+    "#
+);
+
+pass!(
+	template_literal_nested_,
+	r#"
+        let a = "world";
+        let b = `hello ${a}`;
+        let c = `${b}!`;
+        c satisfies string;
+    "#
+);
+
+// Regular expression literal tests
+pass!(
+	regex_literal_simple_,
+	r#"
+        let re = /hello/;
+        re satisfies RegExp;
+    "#
+);
+
+pass!(
+	regex_literal_with_flags_,
+	r#"
+        let re = /hello/gi;
+        re satisfies RegExp;
+    "#
+);
+
+pass!(
+	regex_literal_properties_,
+	r#"
+        let re = /hello/gi;
+        re.source satisfies string;
+        re.global satisfies boolean;
+        re.ignoreCase satisfies boolean;
+        re.multiline satisfies boolean;
+    "#
+);

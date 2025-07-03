@@ -77,6 +77,10 @@ impl<'tcx> BaseChecker<'tcx> {
 					self.tcx.new_const_string(value.clone()),
 					Value::Str(value.clone()),
 				),
+				Lit::Regex(regex) => {
+					// Regular expressions are represented as RegExp objects
+					self.add_local(self.constants.regexp, Value::Regex(regex.exp.clone()))
+				}
 				_ => todo!("{:#?}", lit),
 			},
 			Expr::Ident(ident) => {
@@ -362,6 +366,57 @@ impl<'tcx> BaseChecker<'tcx> {
 				self.add_local(
 					function.ret,
 					Value::Call(callee.id, args.map(|arg| arg.id).collect()),
+				)
+			}
+			Expr::Array(array) => {
+				let elements: Vec<_> = array
+					.elems
+					.iter()
+					.filter_map(|elem| elem.as_ref())
+					.map(|ExprOrSpread { expr, spread }| {
+						if spread.is_some() {
+							todo!("spread in array literal")
+						}
+						self.check_expr(expr)
+					})
+					.collect();
+
+				if elements.is_empty() {
+					// Empty array - we'll need a way to handle generic arrays
+					// For now, return an array of 'never' type
+					self.add_local(
+						self.tcx.new_array(self.constants.never),
+						Value::Array(vec![]),
+					)
+				} else {
+					// Create a union type of all element types
+					let element_types: BTreeSet<_> = elements.iter().map(|e| e.ty).collect();
+					let element_type = if element_types.len() == 1 {
+						*element_types.iter().next().unwrap()
+					} else {
+						self.tcx.new_union(element_types)
+					};
+
+					self.add_local(
+						self.tcx.new_array(element_type),
+						Value::Array(elements.into_iter().map(|e| e.id).collect()),
+					)
+				}
+			}
+			Expr::Tpl(tpl) => {
+				// Template literals always result in string type
+				// We could track the literal value for const strings, but for now just return string
+				let parts: Vec<_> = tpl
+					.exprs
+					.iter()
+					.map(|expr| self.check_expr(expr))
+					.collect();
+
+				// All interpolated expressions should be convertible to string
+				// In TypeScript, this is implicit
+				self.add_local(
+					self.constants.string,
+					Value::Template(parts.into_iter().map(|p| p.id).collect()),
 				)
 			}
 			_ => todo!("{:#?}", expr),

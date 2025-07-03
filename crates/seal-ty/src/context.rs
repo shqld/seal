@@ -11,7 +11,7 @@ use swc_common::SyntaxContext;
 use crate::{
 	Ty, TyKind,
 	intern::interner::Interner,
-	kind::{Class, Function, Interface, Object, Union},
+	kind::{Array, Class, Function, Interface, Object, Union},
 	sir::{Def, DefId},
 	symbol::Symbol,
 };
@@ -102,6 +102,10 @@ impl<'tcx> TyContext<'tcx> {
 	pub fn new_guard(&'tcx self, name: Symbol, ty: Ty<'tcx>) -> Ty<'tcx> {
 		self.new_ty(TyKind::Guard(name, ty))
 	}
+
+	pub fn new_array(&'tcx self, element: Ty<'tcx>) -> Ty<'tcx> {
+		self.new_ty(TyKind::Array(Array::new(element)))
+	}
 }
 
 #[derive(Debug)]
@@ -113,6 +117,7 @@ pub struct TyConstants<'tcx> {
 	pub void: Ty<'tcx>,
 	pub never: Ty<'tcx>,
 	pub lazy: Ty<'tcx>,
+	pub regexp: Ty<'tcx>,
 
 	pub type_of: Ty<'tcx>,
 
@@ -132,6 +137,19 @@ impl<'tcx> TyConstants<'tcx> {
 
 		// TODO: placeholder
 		let object = tcx.new_ty(TyKind::Err);
+		
+		// RegExp is represented as an interface
+		let regexp = tcx.new_interface(Rc::new(Interface::new(
+			Symbol::new((Atom::new("RegExp"), SyntaxContext::empty())),
+			[
+				(Atom::new("source"), string),
+				(Atom::new("global"), boolean),
+				(Atom::new("ignoreCase"), boolean),
+				(Atom::new("multiline"), boolean),
+			]
+			.into_iter()
+			.collect(),
+		)));
 
 		macro_rules! parse_prop {
 			($name:ident: $ty:expr) => {
@@ -159,6 +177,7 @@ impl<'tcx> TyConstants<'tcx> {
 			void,
 			never,
 			lazy,
+			regexp,
 
 			type_of: tcx.new_union(
 				["boolean", "number", "string"]

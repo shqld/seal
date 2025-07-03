@@ -46,13 +46,23 @@ impl<'tcx> BaseChecker<'tcx> {
 	pub fn new(tcx: &'tcx TyContext<'tcx>) -> BaseChecker<'tcx> {
 		let constants = TyConstants::new(tcx);
 
-		BaseChecker {
+		let checker = BaseChecker {
 			tcx,
 			constants,
 			bindings: RefCell::new(HashMap::new()),
 			locals: RefCell::new(HashMap::new()),
 			errors: RefCell::new(vec![]),
-		}
+		};
+
+		// Register built-in types
+		checker.set_binding(
+			&Symbol::new((swc_atoms::Atom::new("RegExp"), swc_common::SyntaxContext::empty())),
+			None,
+			checker.constants.regexp,
+			false,
+		);
+
+		checker
 	}
 
 	pub fn add_local(&self, ty: Ty<'tcx>, value: Value) -> Local<'tcx> {

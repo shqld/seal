@@ -31,4 +31,8 @@ impl Symbol {
 	pub fn new_ret() -> Self {
 		Self((Atom::new("@ret"), SyntaxContext::empty()))
 	}
+
+	pub fn name(&self) -> &Atom {
+		&self.0.0
+	}
 }
