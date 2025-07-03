@@ -27,7 +27,13 @@ impl<'tcx> BaseChecker<'tcx> {
 					_ => todo!("{:#?}", left),
 				};
 				let name = Symbol::new(binding.to_id());
-				let binding = self.get_binding(&name).unwrap();
+				let binding = if let Some(binding) = self.get_binding(&name) {
+					binding
+				} else {
+					// If binding doesn't exist, add an error and return
+					self.add_error(ErrorKind::CannotFindName(name));
+					return self.add_local(self.constants.err, Value::Err);
+				};
 
 				if !binding.is_assignable {
 					self.add_error(ErrorKind::CannotAssignToConst(name.clone()));
@@ -148,6 +154,14 @@ impl<'tcx> BaseChecker<'tcx> {
 						} else {
 							self.add_local(self.constants.boolean, Value::Eq(left.id, right.id))
 						}
+					}
+					BinaryOp::NotEqEq => {
+						// !== operator - strict inequality
+						if !self.overlaps(left.ty, right.ty) {
+							self.add_error(ErrorKind::NoOverlap(left.ty, right.ty));
+							return self.add_local(self.constants.err, Value::Bool(true));
+						}
+						self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::And, left.id, right.id))
 					}
 					// Arithmetic operators
 					BinaryOp::Add => {
@@ -309,9 +323,19 @@ impl<'tcx> BaseChecker<'tcx> {
 					match param {
 						Pat::Ident(ident) => {
 							let name = Symbol::new(ident.to_id());
-							let binding = self.get_binding(&name).unwrap();
+							let param_type = if let Some(type_ann) = &ident.type_ann {
+								self.build_ts_type(&type_ann.type_ann)
+							} else {
+								// If no type annotation, try to get from bindings (for closure context)
+								if let Some(binding) = self.get_binding(&name) {
+									binding.ty
+								} else {
+									// If no binding found, use unknown type
+									self.constants.unknown
+								}
+							};
 
-							params.push((name, binding.ty));
+							params.push((name, param_type));
 						}
 						_ => todo!("{:#?}", param),
 					};
@@ -467,8 +491,15 @@ impl<'tcx> BaseChecker<'tcx> {
 						Value::Array(vec![]),
 					)
 				} else {
-					// Create a union type of all element types
-					let element_types: BTreeSet<_> = elements.iter().map(|e| e.ty).collect();
+					// Create a union type of all element types, normalizing literal types
+					let element_types: BTreeSet<_> = elements.iter().map(|e| {
+						// Normalize literal types to their base types for array inference
+						match e.ty.kind() {
+							TyKind::String(_) => self.constants.string,
+							_ => e.ty,
+						}
+					}).collect();
+					
 					let element_type = if element_types.len() == 1 {
 						*element_types.iter().next().unwrap()
 					} else {
@@ -504,6 +535,10 @@ impl<'tcx> BaseChecker<'tcx> {
 					result = Some(self.check_expr(expr));
 				}
 				result.unwrap_or_else(|| self.add_local(self.constants.void, Value::Err))
+			}
+			Expr::Paren(paren) => {
+				// Parenthesized expression - just evaluate the inner expression
+				self.check_expr(&paren.expr)
 			}
 			_ => todo!("{:#?}", expr),
 		}
