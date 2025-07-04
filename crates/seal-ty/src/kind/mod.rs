@@ -294,9 +294,9 @@ impl TypeParameter {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::symbol::Symbol;
 	use std::collections::BTreeMap;
 	use swc_atoms::Atom;
-	use crate::symbol::Symbol;
 
 	#[test]
 	fn test_object_new() {
@@ -331,7 +331,7 @@ mod tests {
 		let name = Symbol::new((Atom::new("Array"), SyntaxContext::empty()));
 		let type_args = vec![];
 		let generic = Generic::new(name.clone(), type_args.clone());
-		
+
 		assert_eq!(generic.name, name);
 		assert_eq!(generic.type_args, type_args);
 	}
@@ -342,9 +342,9 @@ mod tests {
 		let name = Symbol::new((Atom::new("T"), SyntaxContext::empty()));
 		let constraint = Some(Box::new(TyKind::String(None)));
 		let default = Some(Box::new(TyKind::Number));
-		
+
 		let type_param = TypeParameter::new(name.clone(), constraint, default);
-		
+
 		assert_eq!(type_param.name, name);
 		assert!(type_param.constraint.is_some());
 		assert!(type_param.default.is_some());
@@ -355,7 +355,7 @@ mod tests {
 		use swc_common::SyntaxContext;
 		let name = Symbol::new((Atom::new("T"), SyntaxContext::empty()));
 		let type_param = TypeParameter::new(name.clone(), None, None);
-		
+
 		assert_eq!(type_param.name, name);
 		assert_eq!(type_param.constraint, None);
 		assert_eq!(type_param.default, None);
@@ -366,9 +366,9 @@ mod tests {
 		use swc_common::SyntaxContext;
 		let name = Symbol::new((Atom::new("Person"), SyntaxContext::empty()));
 		let fields = BTreeMap::new();
-		
+
 		let interface = Interface::new(name.clone(), fields.clone());
-		
+
 		assert_eq!(interface.name(), &name);
 		assert_eq!(interface.fields(), &fields);
 	}
@@ -378,16 +378,19 @@ mod tests {
 		use swc_common::SyntaxContext;
 		let name = Symbol::new((Atom::new("Person"), SyntaxContext::empty()));
 		let interface = Interface::new(name, BTreeMap::new());
-		
+
 		assert_eq!(interface.get_prop(&Atom::new("nonexistent")), None);
 	}
 
 	#[test]
 	fn test_class_new_no_constructor() {
 		use swc_common::SyntaxContext;
-		let interface = Rc::new(Interface::new(Symbol::new((Atom::new("MyClass"), SyntaxContext::empty())), BTreeMap::new()));
+		let interface = Rc::new(Interface::new(
+			Symbol::new((Atom::new("MyClass"), SyntaxContext::empty())),
+			BTreeMap::new(),
+		));
 		let class = Class::new(None, interface.clone());
-		
+
 		assert_eq!(class.ctor(), None);
 		assert_eq!(class.interface(), interface);
 	}
@@ -395,9 +398,12 @@ mod tests {
 	#[test]
 	fn test_class_deref() {
 		use swc_common::SyntaxContext;
-		let interface = Rc::new(Interface::new(Symbol::new((Atom::new("MyClass"), SyntaxContext::empty())), BTreeMap::new()));
+		let interface = Rc::new(Interface::new(
+			Symbol::new((Atom::new("MyClass"), SyntaxContext::empty())),
+			BTreeMap::new(),
+		));
 		let class = Class::new(None, interface.clone());
-		
+
 		// Test that deref works
 		assert_eq!(class.name(), interface.name());
 	}
@@ -408,7 +414,10 @@ mod tests {
 		assert_eq!(format!("{}", TyKind::Boolean), "boolean");
 		assert_eq!(format!("{}", TyKind::Number), "number");
 		assert_eq!(format!("{}", TyKind::String(None)), "string");
-		assert_eq!(format!("{}", TyKind::String(Some(Atom::new("hello")))), "\"hello\"");
+		assert_eq!(
+			format!("{}", TyKind::String(Some(Atom::new("hello")))),
+			"\"hello\""
+		);
 		assert_eq!(format!("{}", TyKind::Err), "<err>");
 		assert_eq!(format!("{}", TyKind::Lazy), "<lazy>");
 		assert_eq!(format!("{}", TyKind::Never), "never");
@@ -426,7 +435,7 @@ mod tests {
 	fn test_tykind_string_variants() {
 		let generic_string = TyKind::String(None);
 		let literal_string = TyKind::String(Some(Atom::new("test")));
-		
+
 		assert_eq!(format!("{}", generic_string), "string");
 		assert_eq!(format!("{}", literal_string), "\"test\"");
 	}
@@ -453,7 +462,10 @@ mod tests {
 	#[test]
 	fn test_generic_empty_args() {
 		use swc_common::SyntaxContext;
-		let generic = Generic::new(Symbol::new((Atom::new("Array"), SyntaxContext::empty())), vec![]);
+		let generic = Generic::new(
+			Symbol::new((Atom::new("Array"), SyntaxContext::empty())),
+			vec![],
+		);
 		assert_eq!(generic.type_args.len(), 0);
 	}
 }

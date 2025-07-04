@@ -120,15 +120,24 @@ impl Display for ErrorKind<'_> {
 			}
 			// TS(2326)
 			PropertyTypesIncompatible(prop, expected, actual) => {
-				write!(f, "Types of property '{prop}' are incompatible.\n  Type '{actual}' is not assignable to type '{expected}'.")
+				write!(
+					f,
+					"Types of property '{prop}' are incompatible.\n  Type '{actual}' is not assignable to type '{expected}'."
+				)
 			}
 			// TS(2355)
 			UnexpectedVoid => {
-				write!(f, "A function whose declared type is 'void' must return a value.")
+				write!(
+					f,
+					"A function whose declared type is 'void' must return a value."
+				)
 			}
 			// TS(2367)
 			NoOverlap(left, right) => {
-				write!(f, "This comparison appears to be unintentional because the types '{left}' and '{right}' have no overlap.")
+				write!(
+					f,
+					"This comparison appears to be unintentional because the types '{left}' and '{right}' have no overlap."
+				)
 			}
 			// TS(2339)
 			PropertyDoesNotExist(ty, key) => {
@@ -136,7 +145,10 @@ impl Display for ErrorKind<'_> {
 			}
 			// TS(2345)
 			ArgumentNotAssignable(expected, actual) => {
-				write!(f, "Argument of type '{actual}' is not assignable to parameter of type '{expected}'.")
+				write!(
+					f,
+					"Argument of type '{actual}' is not assignable to parameter of type '{expected}'."
+				)
 			}
 			// TS(2351)
 			NotConstructable => {
@@ -148,7 +160,10 @@ impl Display for ErrorKind<'_> {
 			}
 			// TS(1108)
 			UnexpectedReturn => {
-				write!(f, "A 'return' statement can only be used within a function body.")
+				write!(
+					f,
+					"A 'return' statement can only be used within a function body."
+				)
 			}
 			// TS(2588)
 			CannotAssignToConst(name) => {
@@ -156,7 +171,10 @@ impl Display for ErrorKind<'_> {
 			}
 			// TS(2349)
 			NotCallable(ty) => {
-				write!(f, "This expression is not callable.\n  Type '{ty}' has no call signatures.")
+				write!(
+					f,
+					"This expression is not callable.\n  Type '{ty}' has no call signatures."
+				)
 			}
 			// TS(2454)
 			UsedBeforeAssigned(name) => {
@@ -168,7 +186,10 @@ impl Display for ErrorKind<'_> {
 			}
 			// TS(2540)
 			CannotAssignToReadOnlyProperty(prop) => {
-				write!(f, "Cannot assign to '{prop}' because it is a read-only property.")
+				write!(
+					f,
+					"Cannot assign to '{prop}' because it is a read-only property."
+				)
 			}
 			// TS(1196)
 			CatchParameterCannotHaveTypeAnnotation => {
@@ -187,7 +208,10 @@ impl Display for ErrorKind<'_> {
 					swc_ecma_ast::BinaryOp::GtEq => ">=",
 					_ => "unknown",
 				};
-				write!(f, "Operator '{op_str}' cannot be applied to types '{left}' and '{right}'.")
+				write!(
+					f,
+					"Operator '{op_str}' cannot be applied to types '{left}' and '{right}'."
+				)
 			}
 		}
 	}

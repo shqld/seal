@@ -77,7 +77,7 @@ impl<'tcx> BaseChecker<'tcx> {
 					TsEntityName::Ident(ident) => ident.to_id(),
 					TsEntityName::TsQualifiedName(_) => unimplemented!(),
 				});
-				
+
 				if let Some(binding) = self.get_binding(&name) {
 					match binding.ty.kind() {
 						TyKind::Class(class) => self.tcx.new_interface(class.interface()),

@@ -47,7 +47,7 @@ mod tests {
 		let ctx = SyntaxContext::empty();
 		let id = (atom.clone(), ctx);
 		let symbol = Symbol::new(id);
-		
+
 		assert_eq!(symbol.name(), &atom);
 	}
 
@@ -96,7 +96,7 @@ mod tests {
 		let symbol1 = Symbol::new((Atom::new("same"), SyntaxContext::empty()));
 		let symbol2 = Symbol::new((Atom::new("same"), SyntaxContext::empty()));
 		let symbol3 = Symbol::new((Atom::new("different"), SyntaxContext::empty()));
-		
+
 		assert_eq!(symbol1, symbol2);
 		assert_ne!(symbol1, symbol3);
 	}
@@ -105,7 +105,7 @@ mod tests {
 	fn test_symbol_ord() {
 		let symbol_a = Symbol::new((Atom::new("a"), SyntaxContext::empty()));
 		let symbol_b = Symbol::new((Atom::new("b"), SyntaxContext::empty()));
-		
+
 		assert!(symbol_a < symbol_b);
 	}
 }

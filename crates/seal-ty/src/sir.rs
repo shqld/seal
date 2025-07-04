@@ -162,7 +162,7 @@ mod tests {
 		let ret = Value::Ret;
 		let var = Value::Var;
 		let err = Value::Err;
-		
+
 		assert_eq!(param, Value::Param);
 		assert_eq!(ret, Value::Ret);
 		assert_eq!(var, Value::Var);
@@ -175,7 +175,7 @@ mod tests {
 		let int_val = Value::Int(42);
 		let str_val = Value::Str(Atom::new("test"));
 		let obj_val = Value::Obj(Object::new());
-		
+
 		assert_eq!(bool_val, Value::Bool(true));
 		assert_eq!(int_val, Value::Int(42));
 		assert_eq!(str_val, Value::Str(Atom::new("test")));
@@ -187,7 +187,7 @@ mod tests {
 		let not_op = UnaryOp::Not;
 		let plus_op = UnaryOp::Plus;
 		let minus_op = UnaryOp::Minus;
-		
+
 		assert_eq!(not_op, UnaryOp::Not);
 		assert_eq!(plus_op, UnaryOp::Plus);
 		assert_eq!(minus_op, UnaryOp::Minus);
@@ -205,7 +205,7 @@ mod tests {
 		let gteq_op = BinaryOp::GtEq;
 		let and_op = BinaryOp::And;
 		let or_op = BinaryOp::Or;
-		
+
 		assert_eq!(add_op, BinaryOp::Add);
 		assert_eq!(sub_op, BinaryOp::Sub);
 		assert_eq!(mul_op, BinaryOp::Mul);
@@ -227,14 +227,14 @@ mod tests {
 			ctor: None,
 			methods: Vec::new(),
 		});
-		
+
 		match func {
-			Def::Func(_) => {},
+			Def::Func(_) => {}
 			_ => panic!("Expected Func variant"),
 		}
-		
+
 		match class {
-			Def::Class(_) => {},
+			Def::Class(_) => {}
 			_ => panic!("Expected Class variant"),
 		}
 	}
@@ -247,7 +247,7 @@ mod tests {
 			}),
 			methods: Vec::new(),
 		};
-		
+
 		assert!(class.ctor.is_some());
 		assert_eq!(class.methods.len(), 0);
 	}
@@ -257,7 +257,7 @@ mod tests {
 		let mut obj = Object::new();
 		obj.fields.push((Atom::new("name"), LocalId::new(1)));
 		obj.fields.push((Atom::new("age"), LocalId::new(2)));
-		
+
 		assert_eq!(obj.fields.len(), 2);
 		assert_eq!(obj.fields[0].0, Atom::new("name"));
 		assert_eq!(obj.fields[1].0, Atom::new("age"));

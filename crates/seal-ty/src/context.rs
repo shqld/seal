@@ -145,7 +145,7 @@ impl<'tcx> TyConstants<'tcx> {
 			Symbol::new((Atom::new("Object"), SyntaxContext::empty())),
 			BTreeMap::new(), // Base Object has no specific properties
 		)));
-		
+
 		// RegExp is represented as an interface
 		let regexp = tcx.new_interface(Rc::new(Interface::new(
 			Symbol::new((Atom::new("RegExp"), SyntaxContext::empty())),

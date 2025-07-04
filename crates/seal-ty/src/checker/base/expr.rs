@@ -118,15 +118,24 @@ impl<'tcx> BaseChecker<'tcx> {
 					}
 					UnaryOp::Bang => {
 						// Logical NOT operator - always returns boolean
-						self.add_local(self.constants.boolean, Value::Unary(crate::sir::UnaryOp::Not, value.id))
+						self.add_local(
+							self.constants.boolean,
+							Value::Unary(crate::sir::UnaryOp::Not, value.id),
+						)
 					}
 					UnaryOp::Plus => {
 						// Unary plus - converts to number
-						self.add_local(self.constants.number, Value::Unary(crate::sir::UnaryOp::Plus, value.id))
+						self.add_local(
+							self.constants.number,
+							Value::Unary(crate::sir::UnaryOp::Plus, value.id),
+						)
 					}
 					UnaryOp::Minus => {
-						// Unary minus - converts to number  
-						self.add_local(self.constants.number, Value::Unary(crate::sir::UnaryOp::Minus, value.id))
+						// Unary minus - converts to number
+						self.add_local(
+							self.constants.number,
+							Value::Unary(crate::sir::UnaryOp::Minus, value.id),
+						)
 					}
 					_ => todo!("{:#?}", unary),
 				}
@@ -161,126 +170,160 @@ impl<'tcx> BaseChecker<'tcx> {
 							self.add_error(ErrorKind::NoOverlap(left.ty, right.ty));
 							return self.add_local(self.constants.err, Value::Bool(true));
 						}
-						self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::And, left.id, right.id))
+						self.add_local(
+							self.constants.boolean,
+							Value::Binary(crate::sir::BinaryOp::And, left.id, right.id),
+						)
 					}
 					// Arithmetic operators
-					BinaryOp::Add => {
-						match (left.ty.kind(), right.ty.kind()) {
-							(TyKind::Number, TyKind::Number) => {
-								self.add_local(self.constants.number, Value::Binary(crate::sir::BinaryOp::Add, left.id, right.id))
-							}
-							(TyKind::String(_), TyKind::String(_)) => {
-								self.add_local(self.constants.string, Value::Binary(crate::sir::BinaryOp::Add, left.id, right.id))
-							}
-							_ => {
-								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::Add, left.ty, right.ty));
-								self.add_local(self.constants.err, Value::Err)
-							}
+					BinaryOp::Add => match (left.ty.kind(), right.ty.kind()) {
+						(TyKind::Number, TyKind::Number) => self.add_local(
+							self.constants.number,
+							Value::Binary(crate::sir::BinaryOp::Add, left.id, right.id),
+						),
+						(TyKind::String(_), TyKind::String(_)) => self.add_local(
+							self.constants.string,
+							Value::Binary(crate::sir::BinaryOp::Add, left.id, right.id),
+						),
+						_ => {
+							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
+								BinaryOp::Add,
+								left.ty,
+								right.ty,
+							));
+							self.add_local(self.constants.err, Value::Err)
 						}
-					}
-					BinaryOp::Sub => {
-						match (left.ty.kind(), right.ty.kind()) {
-							(TyKind::Number, TyKind::Number) => {
-								self.add_local(self.constants.number, Value::Binary(crate::sir::BinaryOp::Sub, left.id, right.id))
-							}
-							_ => {
-								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::Sub, left.ty, right.ty));
-								self.add_local(self.constants.err, Value::Err)
-							}
+					},
+					BinaryOp::Sub => match (left.ty.kind(), right.ty.kind()) {
+						(TyKind::Number, TyKind::Number) => self.add_local(
+							self.constants.number,
+							Value::Binary(crate::sir::BinaryOp::Sub, left.id, right.id),
+						),
+						_ => {
+							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
+								BinaryOp::Sub,
+								left.ty,
+								right.ty,
+							));
+							self.add_local(self.constants.err, Value::Err)
 						}
-					}
-					BinaryOp::Mul => {
-						match (left.ty.kind(), right.ty.kind()) {
-							(TyKind::Number, TyKind::Number) => {
-								self.add_local(self.constants.number, Value::Binary(crate::sir::BinaryOp::Mul, left.id, right.id))
-							}
-							_ => {
-								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::Mul, left.ty, right.ty));
-								self.add_local(self.constants.err, Value::Err)
-							}
+					},
+					BinaryOp::Mul => match (left.ty.kind(), right.ty.kind()) {
+						(TyKind::Number, TyKind::Number) => self.add_local(
+							self.constants.number,
+							Value::Binary(crate::sir::BinaryOp::Mul, left.id, right.id),
+						),
+						_ => {
+							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
+								BinaryOp::Mul,
+								left.ty,
+								right.ty,
+							));
+							self.add_local(self.constants.err, Value::Err)
 						}
-					}
-					BinaryOp::Div => {
-						match (left.ty.kind(), right.ty.kind()) {
-							(TyKind::Number, TyKind::Number) => {
-								self.add_local(self.constants.number, Value::Binary(crate::sir::BinaryOp::Div, left.id, right.id))
-							}
-							_ => {
-								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::Div, left.ty, right.ty));
-								self.add_local(self.constants.err, Value::Err)
-							}
+					},
+					BinaryOp::Div => match (left.ty.kind(), right.ty.kind()) {
+						(TyKind::Number, TyKind::Number) => self.add_local(
+							self.constants.number,
+							Value::Binary(crate::sir::BinaryOp::Div, left.id, right.id),
+						),
+						_ => {
+							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
+								BinaryOp::Div,
+								left.ty,
+								right.ty,
+							));
+							self.add_local(self.constants.err, Value::Err)
 						}
-					}
+					},
 					// Comparison operators
-					BinaryOp::Lt => {
-						match (left.ty.kind(), right.ty.kind()) {
-							(TyKind::Number, TyKind::Number) => {
-								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::Lt, left.id, right.id))
-							}
-							(TyKind::String(_), TyKind::String(_)) => {
-								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::Lt, left.id, right.id))
-							}
-							_ => {
-								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::Lt, left.ty, right.ty));
-								self.add_local(self.constants.err, Value::Err)
-							}
+					BinaryOp::Lt => match (left.ty.kind(), right.ty.kind()) {
+						(TyKind::Number, TyKind::Number) => self.add_local(
+							self.constants.boolean,
+							Value::Binary(crate::sir::BinaryOp::Lt, left.id, right.id),
+						),
+						(TyKind::String(_), TyKind::String(_)) => self.add_local(
+							self.constants.boolean,
+							Value::Binary(crate::sir::BinaryOp::Lt, left.id, right.id),
+						),
+						_ => {
+							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
+								BinaryOp::Lt,
+								left.ty,
+								right.ty,
+							));
+							self.add_local(self.constants.err, Value::Err)
 						}
-					}
-					BinaryOp::LtEq => {
-						match (left.ty.kind(), right.ty.kind()) {
-							(TyKind::Number, TyKind::Number) => {
-								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::LtEq, left.id, right.id))
-							}
-							(TyKind::String(_), TyKind::String(_)) => {
-								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::LtEq, left.id, right.id))
-							}
-							_ => {
-								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::LtEq, left.ty, right.ty));
-								self.add_local(self.constants.err, Value::Err)
-							}
+					},
+					BinaryOp::LtEq => match (left.ty.kind(), right.ty.kind()) {
+						(TyKind::Number, TyKind::Number) => self.add_local(
+							self.constants.boolean,
+							Value::Binary(crate::sir::BinaryOp::LtEq, left.id, right.id),
+						),
+						(TyKind::String(_), TyKind::String(_)) => self.add_local(
+							self.constants.boolean,
+							Value::Binary(crate::sir::BinaryOp::LtEq, left.id, right.id),
+						),
+						_ => {
+							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
+								BinaryOp::LtEq,
+								left.ty,
+								right.ty,
+							));
+							self.add_local(self.constants.err, Value::Err)
 						}
-					}
-					BinaryOp::Gt => {
-						match (left.ty.kind(), right.ty.kind()) {
-							(TyKind::Number, TyKind::Number) => {
-								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::Gt, left.id, right.id))
-							}
-							(TyKind::String(_), TyKind::String(_)) => {
-								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::Gt, left.id, right.id))
-							}
-							_ => {
-								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::Gt, left.ty, right.ty));
-								self.add_local(self.constants.err, Value::Err)
-							}
+					},
+					BinaryOp::Gt => match (left.ty.kind(), right.ty.kind()) {
+						(TyKind::Number, TyKind::Number) => self.add_local(
+							self.constants.boolean,
+							Value::Binary(crate::sir::BinaryOp::Gt, left.id, right.id),
+						),
+						(TyKind::String(_), TyKind::String(_)) => self.add_local(
+							self.constants.boolean,
+							Value::Binary(crate::sir::BinaryOp::Gt, left.id, right.id),
+						),
+						_ => {
+							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
+								BinaryOp::Gt,
+								left.ty,
+								right.ty,
+							));
+							self.add_local(self.constants.err, Value::Err)
 						}
-					}
-					BinaryOp::GtEq => {
-						match (left.ty.kind(), right.ty.kind()) {
-							(TyKind::Number, TyKind::Number) => {
-								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::GtEq, left.id, right.id))
-							}
-							(TyKind::String(_), TyKind::String(_)) => {
-								self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::GtEq, left.id, right.id))
-							}
-							_ => {
-								self.add_error(ErrorKind::BinaryOperatorTypeMismatch(BinaryOp::GtEq, left.ty, right.ty));
-								self.add_local(self.constants.err, Value::Err)
-							}
+					},
+					BinaryOp::GtEq => match (left.ty.kind(), right.ty.kind()) {
+						(TyKind::Number, TyKind::Number) => self.add_local(
+							self.constants.boolean,
+							Value::Binary(crate::sir::BinaryOp::GtEq, left.id, right.id),
+						),
+						(TyKind::String(_), TyKind::String(_)) => self.add_local(
+							self.constants.boolean,
+							Value::Binary(crate::sir::BinaryOp::GtEq, left.id, right.id),
+						),
+						_ => {
+							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
+								BinaryOp::GtEq,
+								left.ty,
+								right.ty,
+							));
+							self.add_local(self.constants.err, Value::Err)
 						}
-					}
+					},
 					// Logical operators
-					BinaryOp::LogicalAnd => {
-						self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::And, left.id, right.id))
-					}
-					BinaryOp::LogicalOr => {
-						self.add_local(self.constants.boolean, Value::Binary(crate::sir::BinaryOp::Or, left.id, right.id))
-					}
+					BinaryOp::LogicalAnd => self.add_local(
+						self.constants.boolean,
+						Value::Binary(crate::sir::BinaryOp::And, left.id, right.id),
+					),
+					BinaryOp::LogicalOr => self.add_local(
+						self.constants.boolean,
+						Value::Binary(crate::sir::BinaryOp::Or, left.id, right.id),
+					),
 					_ => todo!("{:#?}", op),
 				}
 			}
 			Expr::Member(MemberExpr { obj, prop, .. }) => {
 				let obj = self.check_expr(obj);
-				
+
 				match &prop {
 					MemberProp::Ident(ident) => {
 						let key = ident.sym.clone();
@@ -492,14 +535,17 @@ impl<'tcx> BaseChecker<'tcx> {
 					)
 				} else {
 					// Create a union type of all element types, normalizing literal types
-					let element_types: BTreeSet<_> = elements.iter().map(|e| {
-						// Normalize literal types to their base types for array inference
-						match e.ty.kind() {
-							TyKind::String(_) => self.constants.string,
-							_ => e.ty,
-						}
-					}).collect();
-					
+					let element_types: BTreeSet<_> = elements
+						.iter()
+						.map(|e| {
+							// Normalize literal types to their base types for array inference
+							match e.ty.kind() {
+								TyKind::String(_) => self.constants.string,
+								_ => e.ty,
+							}
+						})
+						.collect();
+
 					let element_type = if element_types.len() == 1 {
 						*element_types.iter().next().unwrap()
 					} else {
@@ -515,11 +561,7 @@ impl<'tcx> BaseChecker<'tcx> {
 			Expr::Tpl(tpl) => {
 				// Template literals always result in string type
 				// We could track the literal value for const strings, but for now just return string
-				let parts: Vec<_> = tpl
-					.exprs
-					.iter()
-					.map(|expr| self.check_expr(expr))
-					.collect();
+				let parts: Vec<_> = tpl.exprs.iter().map(|expr| self.check_expr(expr)).collect();
 
 				// All interpolated expressions should be convertible to string
 				// In TypeScript, this is implicit
@@ -544,7 +586,11 @@ impl<'tcx> BaseChecker<'tcx> {
 		}
 	}
 
-	fn handle_property_access(&self, obj: crate::sir::Local<'tcx>, key: swc_atoms::Atom) -> crate::sir::Local<'tcx> {
+	fn handle_property_access(
+		&self,
+		obj: crate::sir::Local<'tcx>,
+		key: swc_atoms::Atom,
+	) -> crate::sir::Local<'tcx> {
 		match obj.ty.kind() {
 			TyKind::Object(obj_ty) => match obj_ty.get_prop(&key) {
 				Some(ty) => self.add_local(ty, Value::Member(obj.id, key)),
@@ -605,16 +651,24 @@ impl<'tcx> BaseChecker<'tcx> {
 		}
 	}
 
-	fn handle_computed_access(&self, obj: crate::sir::Local<'tcx>, index: crate::sir::Local<'tcx>) -> crate::sir::Local<'tcx> {
+	fn handle_computed_access(
+		&self,
+		obj: crate::sir::Local<'tcx>,
+		index: crate::sir::Local<'tcx>,
+	) -> crate::sir::Local<'tcx> {
 		match obj.ty.kind() {
 			TyKind::Array(array) => {
 				// For arrays, index should be number and we return element type
 				match index.ty.kind() {
-					TyKind::Number => {
-						self.add_local(array.element, Value::Member(obj.id, swc_atoms::Atom::new("element")))
-					}
+					TyKind::Number => self.add_local(
+						array.element,
+						Value::Member(obj.id, swc_atoms::Atom::new("element")),
+					),
 					_ => {
-						self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, swc_atoms::Atom::new("element")));
+						self.add_error(ErrorKind::PropertyDoesNotExist(
+							obj.ty,
+							swc_atoms::Atom::new("element"),
+						));
 						self.add_local(self.constants.err, Value::Err)
 					}
 				}
@@ -629,16 +683,25 @@ impl<'tcx> BaseChecker<'tcx> {
 					TyKind::String(None) => {
 						// Dynamic string key - we can't statically determine the type
 						// In a more sophisticated implementation, we'd use index signatures
-						self.add_local(self.constants.unknown, Value::Member(obj.id, swc_atoms::Atom::new("computed")))
+						self.add_local(
+							self.constants.unknown,
+							Value::Member(obj.id, swc_atoms::Atom::new("computed")),
+						)
 					}
 					_ => {
-						self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, swc_atoms::Atom::new("computed")));
+						self.add_error(ErrorKind::PropertyDoesNotExist(
+							obj.ty,
+							swc_atoms::Atom::new("computed"),
+						));
 						self.add_local(self.constants.err, Value::Err)
 					}
 				}
 			}
 			_ => {
-				self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, swc_atoms::Atom::new("computed")));
+				self.add_error(ErrorKind::PropertyDoesNotExist(
+					obj.ty,
+					swc_atoms::Atom::new("computed"),
+				));
 				self.add_local(self.constants.err, Value::Err)
 			}
 		}
