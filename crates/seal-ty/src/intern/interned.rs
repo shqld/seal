@@ -99,6 +99,7 @@ mod tests {
 	fn test_interned_clone() {
 		let value = "hello".to_string();
 		let interned = Interned::new(&value, 0);
+		#[allow(clippy::clone_on_copy)]
 		let cloned = interned.clone();
 		assert_eq!(interned.get(), cloned.get());
 		assert_eq!(interned.id(), cloned.id());
@@ -111,7 +112,7 @@ mod tests {
 		let interned1 = Interned::new(&value1, 1);
 		let interned2 = Interned::new(&value2, 1);
 		let interned3 = Interned::new(&value1, 2);
-		
+
 		// Same ID means equal
 		assert_eq!(interned1, interned2);
 		// Different ID means not equal
@@ -125,7 +126,7 @@ mod tests {
 		let interned1 = Interned::new(&value1, 1);
 		let interned2 = Interned::new(&value2, 2);
 		let interned3 = Interned::new(&value1, 3);
-		
+
 		assert!(interned1 < interned2);
 		assert!(interned2 < interned3);
 		assert!(interned1 < interned3);
@@ -151,23 +152,23 @@ mod tests {
 	fn test_interned_hash() {
 		use std::collections::hash_map::DefaultHasher;
 		use std::hash::{Hash, Hasher};
-		
+
 		let value1 = "hello".to_string();
 		let value2 = "hello".to_string();
 		let interned1 = Interned::new(&value1, 0);
 		let interned2 = Interned::new(&value2, 0);
-		
+
 		let mut hasher1 = DefaultHasher::new();
 		let mut hasher2 = DefaultHasher::new();
-		
+
 		interned1.hash(&mut hasher1);
 		interned2.hash(&mut hasher2);
-		
+
 		// Hash is based on pointer, so different instances will have different hashes
 		// even if they contain the same value
 		let hash1 = hasher1.finish();
 		let hash2 = hasher2.finish();
-		
+
 		// We can't assert they're different because they might coincidentally be the same
 		// But we can assert that the hash function doesn't panic
 		assert!(hash1 == hash1); // Identity check

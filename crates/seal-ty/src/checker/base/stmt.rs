@@ -1,6 +1,9 @@
 use std::collections::BTreeSet;
 
-use swc_ecma_ast::{BreakStmt, ContinueStmt, DoWhileStmt, ExprStmt, ForStmt, IfStmt, Stmt, SwitchStmt, ThrowStmt, TryStmt, WhileStmt};
+use swc_ecma_ast::{
+	BreakStmt, ContinueStmt, DoWhileStmt, ExprStmt, ForStmt, IfStmt, Stmt, SwitchStmt, ThrowStmt,
+	TryStmt, WhileStmt,
+};
 
 use crate::TyKind;
 
@@ -82,7 +85,7 @@ impl BaseChecker<'_> {
 			Stmt::While(WhileStmt { test, body, .. }) => {
 				// Check test expression
 				self.check_expr(test);
-				
+
 				// Check body in new scope
 				let checker = self.new_scoped_checker();
 				checker.check_stmt(body);
@@ -91,32 +94,42 @@ impl BaseChecker<'_> {
 				// Check body first (since it always executes at least once)
 				let checker = self.new_scoped_checker();
 				checker.check_stmt(body);
-				
+
 				// Then check test expression
 				self.check_expr(test);
 			}
-			Stmt::For(ForStmt { init, test, update, body, .. }) => {
+			Stmt::For(ForStmt {
+				init,
+				test,
+				update,
+				body,
+				..
+			}) => {
 				// Create new scope for the entire for loop
 				let checker = self.new_scoped_checker();
-				
+
 				// Check init (variable declaration or expression)
 				if let Some(init) = init {
 					match init {
-						swc_ecma_ast::VarDeclOrExpr::VarDecl(decl) => checker.check_decl(&swc_ecma_ast::Decl::Var(decl.clone())),
-						swc_ecma_ast::VarDeclOrExpr::Expr(expr) => { checker.check_expr(&expr); }
+						swc_ecma_ast::VarDeclOrExpr::VarDecl(decl) => {
+							checker.check_decl(&swc_ecma_ast::Decl::Var(decl.clone()))
+						}
+						swc_ecma_ast::VarDeclOrExpr::Expr(expr) => {
+							checker.check_expr(expr);
+						}
 					}
 				}
-				
+
 				// Check test expression
 				if let Some(test) = test {
 					checker.check_expr(test);
 				}
-				
-				// Check update expression  
+
+				// Check update expression
 				if let Some(update) = update {
 					checker.check_expr(update);
 				}
-				
+
 				// Check body
 				checker.check_stmt(body);
 			}
@@ -126,19 +139,23 @@ impl BaseChecker<'_> {
 			Stmt::Continue(ContinueStmt { .. }) => {
 				// Continue statement - no type checking needed
 			}
-			Stmt::Switch(SwitchStmt { discriminant, cases, .. }) => {
+			Stmt::Switch(SwitchStmt {
+				discriminant,
+				cases,
+				..
+			}) => {
 				// Check discriminant expression
 				let _discriminant_value = self.check_expr(discriminant);
-				
+
 				// Check each case
 				for case in cases {
 					let checker = self.new_scoped_checker();
-					
+
 					// Check case test expression if it exists
 					if let Some(test) = &case.test {
 						checker.check_expr(test);
 					}
-					
+
 					// Check case body
 					for stmt in &case.cons {
 						checker.check_stmt(stmt);
@@ -150,43 +167,46 @@ impl BaseChecker<'_> {
 				self.check_expr(arg);
 			}
 			Stmt::Try(try_stmt) => {
-				let TryStmt { block, handler, finalizer, .. } = try_stmt.as_ref();
+				let TryStmt {
+					block,
+					handler,
+					finalizer,
+					..
+				} = try_stmt.as_ref();
 				// Check try block
 				for stmt in &block.stmts {
 					self.check_stmt(stmt);
 				}
-				
+
 				// Check catch handler if it exists
 				if let Some(handler) = handler {
 					let checker = self.new_scoped_checker();
-					
+
 					// Check catch parameter if it exists
-					if let Some(param) = &handler.param {
-						match param {
-							swc_ecma_ast::Pat::Ident(ident) => {
-								// Check if there's a type annotation - this should be an error
-								if ident.type_ann.is_some() {
-									self.add_error(crate::checker::errors::ErrorKind::CatchParameterCannotHaveTypeAnnotation);
-								}
-								
-								// Always bind the catch parameter as unknown type
-								let name = crate::symbol::Symbol::new(ident.to_id());
-								let catch_value = checker.add_local(self.constants.unknown, crate::sir::Value::Param);
-								checker.set_binding(&name, Some(catch_value), self.constants.unknown, false);
-							}
-							_ => {
-								// Other pattern types (destructuring, etc.) are not commonly used in catch
-								// For now, we'll skip detailed handling
-							}
+					if let Some(swc_ecma_ast::Pat::Ident(ident)) = &handler.param {
+						// Check if there's a type annotation - this should be an error
+						if ident.type_ann.is_some() {
+							self.add_error(crate::checker::errors::ErrorKind::CatchParameterCannotHaveTypeAnnotation);
 						}
+
+						// Always bind the catch parameter as unknown type
+						let name = crate::symbol::Symbol::new(ident.to_id());
+						let catch_value =
+							checker.add_local(self.constants.unknown, crate::sir::Value::Param);
+						checker.set_binding(
+							&name,
+							Some(catch_value),
+							self.constants.unknown,
+							false,
+						);
 					}
-					
+
 					// Check catch body
 					for stmt in &handler.body.stmts {
 						checker.check_stmt(stmt);
 					}
 				}
-				
+
 				// Check finally block if it exists
 				if let Some(finalizer) = finalizer {
 					for stmt in &finalizer.stmts {
