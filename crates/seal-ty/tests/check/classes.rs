@@ -135,40 +135,48 @@ pass!(
 );
 
 pass!(
-	class_inheritance_basic,
+	class_with_multiple_properties,
 	r#"
         class Animal {
             name: string = "default";
+            age: number = 0;
         }
         
         let animal = new Animal();
         animal satisfies Animal;
         animal.name satisfies string;
+        animal.age satisfies number;
     "#
 );
 
 pass!(
-	class_method_overriding,
+	class_with_multiple_methods,
 	r#"
-        class Shape {
-            getArea(): number {
-                return 0;
+        class Calculator {
+            add(a: number, b: number): number {
+                return a + b;
+            }
+            
+            multiply(a: number, b: number): number {
+                return a * b;
             }
         }
         
-        let shape = new Shape();
-        shape.getArea satisfies () => number;
+        let calc = new Calculator();
+        calc.add satisfies (a: number, b: number) => number;
+        calc.multiply satisfies (a: number, b: number) => number;
     "#
 );
 
-pass!(
-	class_private_property_access,
+fail!(
+	class_property_access_nonexistent,
 	r#"
         class BankAccount {
             balance: number = 1000;
         }
         
         let account = new BankAccount();
-        account.balance satisfies number;
-    "#
+        account.pin;
+    "#,
+	&["Property 'pin' does not exist on type 'BankAccount'."]
 );
