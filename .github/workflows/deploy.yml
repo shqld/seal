@@ -9,6 +9,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
+    concurrency:
+      group: "pages"
+      cancel-in-progress: true
     
     permissions:
       contents: read
