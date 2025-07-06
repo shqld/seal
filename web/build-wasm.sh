@@ -7,9 +7,9 @@ if ! command -v wasm-pack &> /dev/null; then
     exit 1
 fi
 
-# Build the WASM module
-echo "Building WASM module..."
+# Build the WASM module with debug info
+echo "Building WASM module with debug info..."
 cd ../crates/seal-cli || exit 1
-wasm-pack build --target web --out-dir ../../web/src/wasm
+wasm-pack build --target web --debug --out-dir ../../web/src/wasm
 
 echo "WASM module built successfully!"

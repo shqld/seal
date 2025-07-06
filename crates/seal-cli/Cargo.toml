@@ -23,3 +23,14 @@ tempfile = "3.8"
 wasm-bindgen = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = "0.6"
+console_error_panic_hook = "0.1"
+
+# Debug build profile for WASM
+[profile.dev]
+debug = true
+debug-assertions = true
+overflow-checks = true
+
+[profile.release]
+debug = true  # Keep debug info even in release builds for better error traces
+lto = false   # Disable LTO to preserve stack traces
