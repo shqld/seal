@@ -9,7 +9,18 @@ const STORAGE_KEY = "seal-typescript-code";
 
 function App() {
 	const [code, setCode] = useState(() => {
-		// Load code from localStorage on initialization
+		// First, try to load from URL parameters
+		try {
+			const urlParams = new URLSearchParams(window.location.search);
+			const codeFromUrl = urlParams.get("code");
+			if (codeFromUrl) {
+				return decodeURIComponent(atob(codeFromUrl));
+			}
+		} catch (error) {
+			console.warn("Failed to load code from URL:", error);
+		}
+
+		// Then try localStorage
 		try {
 			const savedCode = localStorage.getItem(STORAGE_KEY);
 			if (savedCode) {
@@ -19,7 +30,7 @@ function App() {
 			console.warn("Failed to load code from localStorage:", error);
 		}
 
-		// Default code if localStorage is empty or fails
+		// Default code if both URL and localStorage are empty or fail
 		return `const x: number = 42;
 const y: string = "hello";
 
@@ -30,10 +41,21 @@ function add(a: number, b: number): number {
 // This will produce an error
 const result: string = add(1, 2);`;
 	});
+	const [prevCode, setPrevCode] = useState(code);
 
 	const [errors, setErrors] = useState<TypeCheckError[]>([]);
 	const [wasmModule, setWasmModule] = useState<WasmModule | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
+	const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">(
+		"idle"
+	);
+
+	// Reset copy status when code changes
+	if (prevCode !== code) {
+		setPrevCode(code);
+		setCopyStatus("idle");
+	}
+
 	const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
 	const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
@@ -53,6 +75,17 @@ const result: string = add(1, 2);`;
 		};
 
 		loadWasm();
+	}, []);
+
+	// Update URL when code changes (without page reload)
+	useEffect(() => {
+		// Don't update URL on initial load
+		const urlParams = new URLSearchParams(window.location.search);
+		if (urlParams.has("code")) {
+			const newUrl = new URL(window.location.href);
+			newUrl.searchParams.delete("code");
+			window.history.replaceState({}, "", newUrl.toString());
+		}
 	}, []);
 
 	// Save code to localStorage with debounce
@@ -149,15 +182,58 @@ const result: string = add(1, 2);`;
 		});
 	};
 
+	const handleShare = () => {
+		try {
+			const encodedCode = btoa(encodeURIComponent(code));
+			const url = new URL(window.location.href);
+			url.searchParams.set("code", encodedCode);
+
+			// Update address bar without page reload
+			window.history.replaceState({}, "", url.toString());
+
+			setCopyStatus("copied");
+		} catch (error) {
+			console.error("Failed to update URL:", error);
+			setCopyStatus("error");
+		}
+	};
+
 	return (
 		<div
 			className="container is-fluid"
 			style={{ padding: "2rem", maxWidth: "1600px" }}
 		>
-			<h1 className="title is-2">Seal TypeScript</h1>
-			<p className="subtitle is-5">
-				A TypeScript written in Rust, running in your browser via WebAssembly
-			</p>
+			<div className="level">
+				<div className="level-left">
+					<div className="level-item">
+						<div>
+							<h1 className="title is-2">Seal TypeScript</h1>
+							<p className="subtitle is-5">
+								A TypeScript written in Rust, running in your browser via
+								WebAssembly
+							</p>
+						</div>
+					</div>
+				</div>
+				<div className="level-right">
+					<div className="level-item">
+						<button
+							type="button"
+							className={`button is-primary ${copyStatus === "copied" ? "is-success" : ""} ${copyStatus === "error" ? "is-danger" : ""}`}
+							onClick={handleShare}
+							disabled={isLoading}
+						>
+							<span>
+								{copyStatus === "copied"
+									? "✓ URL Updated!"
+									: copyStatus === "error"
+										? "✗ Error"
+										: "🔗 Share"}
+							</span>
+						</button>
+					</div>
+				</div>
+			</div>
 
 			{isLoading ? (
 				<div className="notification is-info">
