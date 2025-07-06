@@ -157,5 +157,5 @@ fail!(
         let obj = { a: { b: { c: 42 } } };
         obj.a.b.d;
     "#,
-	&["Property 'd' does not exist on type '{c: number}'."]
+	&["Property 'd' does not exist on type '{c: 42}'."]
 );

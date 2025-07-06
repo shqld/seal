@@ -48,7 +48,15 @@ impl<'tcx> BaseChecker<'tcx> {
 				// TODO: binding is Option<Local>, so we can remove TyKind::Lazy and check if it's None
 				if let TyKind::Lazy = binding.ty.kind() {
 					// if no type is specified to the declaration, replace with actual type
-					self.set_binding(&name, Some(value), value.ty, true);
+					// For let variables, widen literal types to base types
+					let inferred_type = if binding.is_assignable {
+						// let variable - widen literal types (42 -> number, true -> boolean)
+						self.widen(value.ty)
+					} else {
+						// const variable - keep literal types
+						value.ty
+					};
+					self.set_binding(&name, Some(value), inferred_type, true);
 					return value;
 				}
 
@@ -74,11 +82,11 @@ impl<'tcx> BaseChecker<'tcx> {
 			}
 			Expr::Lit(lit) => match lit {
 				Lit::Bool(Bool { value, .. }) => {
-					self.add_local(self.constants.boolean, Value::Bool(*value))
+					self.add_local(self.tcx.new_const_boolean(*value), Value::Bool(*value))
 				}
 				Lit::Num(Number { value, .. }) => {
 					self.add_local(
-						self.constants.number,
+						self.tcx.new_const_number(*value as i64),
 						// TODO: float
 						Value::Int(*value as i64),
 					)
@@ -191,7 +199,7 @@ impl<'tcx> BaseChecker<'tcx> {
 					}
 					// Arithmetic operators
 					BinaryOp::Add => match (left.ty.kind(), right.ty.kind()) {
-						(TyKind::Number, TyKind::Number) => self.add_local(
+						(TyKind::Number(_), TyKind::Number(_)) => self.add_local(
 							self.constants.number,
 							Value::Binary(crate::sir::BinaryOp::Add, left.id, right.id),
 						),
@@ -212,7 +220,7 @@ impl<'tcx> BaseChecker<'tcx> {
 						}
 					},
 					BinaryOp::Sub => match (left.ty.kind(), right.ty.kind()) {
-						(TyKind::Number, TyKind::Number) => self.add_local(
+						(TyKind::Number(_), TyKind::Number(_)) => self.add_local(
 							self.constants.number,
 							Value::Binary(crate::sir::BinaryOp::Sub, left.id, right.id),
 						),
@@ -229,7 +237,7 @@ impl<'tcx> BaseChecker<'tcx> {
 						}
 					},
 					BinaryOp::Mul => match (left.ty.kind(), right.ty.kind()) {
-						(TyKind::Number, TyKind::Number) => self.add_local(
+						(TyKind::Number(_), TyKind::Number(_)) => self.add_local(
 							self.constants.number,
 							Value::Binary(crate::sir::BinaryOp::Mul, left.id, right.id),
 						),
@@ -246,7 +254,7 @@ impl<'tcx> BaseChecker<'tcx> {
 						}
 					},
 					BinaryOp::Div => match (left.ty.kind(), right.ty.kind()) {
-						(TyKind::Number, TyKind::Number) => self.add_local(
+						(TyKind::Number(_), TyKind::Number(_)) => self.add_local(
 							self.constants.number,
 							Value::Binary(crate::sir::BinaryOp::Div, left.id, right.id),
 						),
@@ -264,7 +272,7 @@ impl<'tcx> BaseChecker<'tcx> {
 					},
 					// Comparison operators
 					BinaryOp::Lt => match (left.ty.kind(), right.ty.kind()) {
-						(TyKind::Number, TyKind::Number) => self.add_local(
+						(TyKind::Number(_), TyKind::Number(_)) => self.add_local(
 							self.constants.boolean,
 							Value::Binary(crate::sir::BinaryOp::Lt, left.id, right.id),
 						),
@@ -285,7 +293,7 @@ impl<'tcx> BaseChecker<'tcx> {
 						}
 					},
 					BinaryOp::LtEq => match (left.ty.kind(), right.ty.kind()) {
-						(TyKind::Number, TyKind::Number) => self.add_local(
+						(TyKind::Number(_), TyKind::Number(_)) => self.add_local(
 							self.constants.boolean,
 							Value::Binary(crate::sir::BinaryOp::LtEq, left.id, right.id),
 						),
@@ -306,7 +314,7 @@ impl<'tcx> BaseChecker<'tcx> {
 						}
 					},
 					BinaryOp::Gt => match (left.ty.kind(), right.ty.kind()) {
-						(TyKind::Number, TyKind::Number) => self.add_local(
+						(TyKind::Number(_), TyKind::Number(_)) => self.add_local(
 							self.constants.boolean,
 							Value::Binary(crate::sir::BinaryOp::Gt, left.id, right.id),
 						),
@@ -327,7 +335,7 @@ impl<'tcx> BaseChecker<'tcx> {
 						}
 					},
 					BinaryOp::GtEq => match (left.ty.kind(), right.ty.kind()) {
-						(TyKind::Number, TyKind::Number) => self.add_local(
+						(TyKind::Number(_), TyKind::Number(_)) => self.add_local(
 							self.constants.boolean,
 							Value::Binary(crate::sir::BinaryOp::GtEq, left.id, right.id),
 						),
@@ -588,6 +596,8 @@ impl<'tcx> BaseChecker<'tcx> {
 							// Normalize literal types to their base types for array inference
 							match e.ty.kind() {
 								TyKind::String(_) => self.constants.string,
+								TyKind::Number(_) => self.constants.number,
+								TyKind::Boolean(_) => self.constants.boolean,
 								_ => e.ty,
 							}
 						})
@@ -682,7 +692,7 @@ impl<'tcx> BaseChecker<'tcx> {
 			}
 			_ => {
 				// Check for primitive methods
-				let (name, props) = if let TyKind::Number = obj.ty.kind() {
+				let (name, props) = if let TyKind::Number(_) = obj.ty.kind() {
 					("number", &self.constants.proto_number)
 				} else if let TyKind::String(_) = obj.ty.kind() {
 					("string", &self.constants.proto_string)
@@ -724,7 +734,7 @@ impl<'tcx> BaseChecker<'tcx> {
 			TyKind::Array(array) => {
 				// For arrays, index should be number and we return element type
 				match index.ty.kind() {
-					TyKind::Number => self.add_local(
+					TyKind::Number(_) => self.add_local(
 						array.element,
 						Value::Member(obj.id, swc_atoms::Atom::new("element")),
 					),

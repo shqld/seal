@@ -68,6 +68,14 @@ impl<'tcx> TyContext<'tcx> {
 		self.new_ty(TyKind::String(Some(value)))
 	}
 
+	pub fn new_const_number(&'tcx self, value: i64) -> Ty<'tcx> {
+		self.new_ty(TyKind::Number(Some(value)))
+	}
+
+	pub fn new_const_boolean(&'tcx self, value: bool) -> Ty<'tcx> {
+		self.new_ty(TyKind::Boolean(Some(value)))
+	}
+
 	pub fn new_function(&'tcx self, function: Function<'tcx>) -> Ty<'tcx> {
 		self.new_ty(TyKind::Function(function))
 	}
@@ -130,8 +138,8 @@ pub struct TyConstants<'tcx> {
 
 impl<'tcx> TyConstants<'tcx> {
 	pub fn new(tcx: &'tcx TyContext<'tcx>) -> Self {
-		let boolean = tcx.new_ty(TyKind::Boolean);
-		let number = tcx.new_ty(TyKind::Number);
+		let boolean = tcx.new_ty(TyKind::Boolean(None));
+		let number = tcx.new_ty(TyKind::Number(None));
 		let string = tcx.new_ty(TyKind::String(None));
 		let err = tcx.new_ty(TyKind::Err);
 		let void = tcx.new_ty(TyKind::Void);

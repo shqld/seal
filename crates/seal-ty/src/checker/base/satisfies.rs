@@ -21,10 +21,15 @@ impl<'tcx> BaseChecker<'tcx> {
 			// Lazy types must be replaced with their actual types before checking
 			(Lazy, _) | (_, Lazy) => panic!("Lazy types must not be present in satisfies"),
 			// any guard can satisfy 'boolean', not vice versa
-			(Boolean, Guard(_, _)) => true,
+			(Boolean(_), Guard(_, _)) => true,
 
-			// any const string can satisfy 'string', not vice versa
+			// Literal type assignability rules (TypeScript-compliant):
+			// - any const string can satisfy 'string', not vice versa
 			(String(None), String(_)) => true,
+			// - any const number can satisfy 'number', not vice versa
+			(Number(None), Number(_)) => true,
+			// - any const boolean can satisfy 'boolean', not vice versa
+			(Boolean(None), Boolean(_)) => true,
 
 			(Function(expected), Function(actual)) => {
 				if expected.params.len() != actual.params.len() {
@@ -126,6 +131,32 @@ impl<'tcx> BaseChecker<'tcx> {
 				true
 			}
 
+			// Object structural compatibility with widened property types
+			(Object(expected_obj), Object(actual_obj)) => {
+				// For different interface names, use structural typing:
+				// Check if actual interface has all properties of expected interface
+				for (prop, expected_ty) in expected_obj.fields() {
+					match actual_obj.get_prop(prop) {
+						Some(actual_ty) => {
+							if !self.satisfies(*expected_ty, actual_ty) {
+								return false;
+							}
+						}
+						None => return false,
+					}
+				}
+
+				// If expected interface has no properties, the structural check would pass
+				// but we should only allow this if the interfaces are related through inheritance
+				// For now, we'll be strict and require same names for empty interfaces
+				if expected_obj.fields().is_empty() && actual_obj.fields().is_empty() {
+					// Both are empty but different names - only allow if there's an inheritance relationship
+					// For simplicity, we'll return false to maintain existing behavior
+					false
+				} else {
+					true
+				}
+			}
 			_ => expected == actual,
 		};
 

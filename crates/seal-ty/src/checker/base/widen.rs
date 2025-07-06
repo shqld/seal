@@ -8,8 +8,8 @@ impl<'tcx> BaseChecker<'tcx> {
 
 		match ty.kind() {
 			String(_) => self.constants.string,
-			Number => self.constants.number,
-			Boolean => self.constants.boolean,
+			Number(_) => self.constants.number,
+			Boolean(_) => self.constants.boolean,
 			Guard(_, _) => self.constants.boolean,
 			_ => ty,
 		}

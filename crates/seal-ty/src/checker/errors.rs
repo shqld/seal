@@ -114,6 +114,14 @@ impl Display for ErrorKind<'_> {
 				if !matches!(expected.kind(), String(_)) && matches!(actual.kind(), String(Some(_)))
 				{
 					write!(f, "Type 'string' is not assignable to type '{expected}'.")
+				} else if !matches!(expected.kind(), Number(_))
+					&& matches!(actual.kind(), Number(Some(_)))
+				{
+					write!(f, "Type 'number' is not assignable to type '{expected}'.")
+				} else if !matches!(expected.kind(), Boolean(_))
+					&& matches!(actual.kind(), Boolean(Some(_)))
+				{
+					write!(f, "Type 'boolean' is not assignable to type '{expected}'.")
 				} else {
 					write!(f, "Type '{actual}' is not assignable to type '{expected}'.")
 				}
@@ -218,7 +226,10 @@ impl Display for ErrorKind<'_> {
 				)
 			}
 			ExtendsNonClass(ty) => {
-				write!(f, "Class extends value '{ty}' which is not a constructor function type.")
+				write!(
+					f,
+					"Class extends value '{ty}' which is not a constructor function type."
+				)
 			}
 		}
 	}

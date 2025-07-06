@@ -14,8 +14,8 @@ use crate::{Ty, symbol::Symbol};
 pub enum TyKind<'tcx> {
 	// value types
 	Void,
-	Boolean,
-	Number,
+	Boolean(Option<bool>),
+	Number(Option<i64>),
 	String(Option<Atom>),
 	Object(Object<'tcx>),
 	Function(Function<'tcx>),
@@ -48,8 +48,14 @@ impl Display for TyKind<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			TyKind::Void => write!(f, "void"),
-			TyKind::Boolean => write!(f, "boolean"),
-			TyKind::Number => write!(f, "number"),
+			TyKind::Boolean(value) => match value {
+				Some(value) => write!(f, "{}", value),
+				None => write!(f, "boolean"),
+			},
+			TyKind::Number(value) => match value {
+				Some(value) => write!(f, "{}", value),
+				None => write!(f, "number"),
+			},
 			TyKind::String(value) => match value {
 				Some(value) => write!(f, "\"{}\"", value),
 				None => write!(f, "string"),
@@ -175,6 +181,10 @@ pub struct Object<'tcx> {
 impl<'tcx> Object<'tcx> {
 	pub fn new(fields: BTreeMap<Atom, Ty<'tcx>>) -> Self {
 		Self { fields }
+	}
+
+	pub fn fields(&self) -> &BTreeMap<Atom, Ty<'tcx>> {
+		&self.fields
 	}
 
 	pub fn get_prop(&self, key: &Atom) -> Option<Ty<'tcx>> {
@@ -361,7 +371,7 @@ mod tests {
 		use swc_common::SyntaxContext;
 		let name = Symbol::new((Atom::new("T"), SyntaxContext::empty()));
 		let constraint = Some(Box::new(TyKind::String(None)));
-		let default = Some(Box::new(TyKind::Number));
+		let default = Some(Box::new(TyKind::Number(None)));
 
 		let type_param = TypeParameter::new(name.clone(), constraint, default);
 
@@ -431,8 +441,11 @@ mod tests {
 	#[test]
 	fn test_tykind_display_primitives() {
 		assert_eq!(format!("{}", TyKind::Void), "void");
-		assert_eq!(format!("{}", TyKind::Boolean), "boolean");
-		assert_eq!(format!("{}", TyKind::Number), "number");
+		assert_eq!(format!("{}", TyKind::Boolean(None)), "boolean");
+		assert_eq!(format!("{}", TyKind::Boolean(Some(true))), "true");
+		assert_eq!(format!("{}", TyKind::Boolean(Some(false))), "false");
+		assert_eq!(format!("{}", TyKind::Number(None)), "number");
+		assert_eq!(format!("{}", TyKind::Number(Some(42))), "42");
 		assert_eq!(format!("{}", TyKind::String(None)), "string");
 		assert_eq!(
 			format!("{}", TyKind::String(Some(Atom::new("hello")))),
@@ -447,7 +460,7 @@ mod tests {
 
 	#[test]
 	fn test_tykind_debug_uses_display() {
-		let ty = TyKind::Number;
+		let ty = TyKind::Number(None);
 		assert_eq!(format!("{:?}", ty), format!("{}", ty));
 	}
 
