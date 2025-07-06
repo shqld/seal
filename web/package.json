@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "./build-wasm.sh && vite",
     "build": "./build-wasm.sh && vite build",
-    "lint": "biome check .",
+    "preview": "vite preview",
+    "check": "biome check && tsc --noEmit",
     "fmt": "biome format --write .",
-    "preview": "vite preview"
+    "lint": "biome check --write .",
+    "tsc": "tsc --noEmit"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
@@ -27,6 +29,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.2.0",
+    "typescript": "^5.8.3",
     "vite": "^7.0.0"
   }
 }
