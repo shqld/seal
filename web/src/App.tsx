@@ -5,8 +5,22 @@ import type { TypeCheckError, WasmModule } from "./types";
 import "bulma/css/bulma.min.css";
 import "./App.css";
 
+const STORAGE_KEY = "seal-typescript-code";
+
 function App() {
-	const [code, setCode] = useState(`const x: number = 42;
+	const [code, setCode] = useState(() => {
+		// Load code from localStorage on initialization
+		try {
+			const savedCode = localStorage.getItem(STORAGE_KEY);
+			if (savedCode) {
+				return savedCode;
+			}
+		} catch (error) {
+			console.warn("Failed to load code from localStorage:", error);
+		}
+
+		// Default code if localStorage is empty or fails
+		return `const x: number = 42;
 const y: string = "hello";
 
 function add(a: number, b: number): number {
@@ -14,7 +28,8 @@ function add(a: number, b: number): number {
 }
 
 // This will produce an error
-const result: string = add(1, 2);`);
+const result: string = add(1, 2);`;
+	});
 
 	const [errors, setErrors] = useState<TypeCheckError[]>([]);
 	const [wasmModule, setWasmModule] = useState<WasmModule | null>(null);
@@ -39,6 +54,19 @@ const result: string = add(1, 2);`);
 
 		loadWasm();
 	}, []);
+
+	// Save code to localStorage with debounce
+	useEffect(() => {
+		const saveTimer = setTimeout(() => {
+			try {
+				localStorage.setItem(STORAGE_KEY, code);
+			} catch (error) {
+				console.warn("Failed to save code to localStorage:", error);
+			}
+		}, 300);
+
+		return () => clearTimeout(saveTimer);
+	}, [code]);
 
 	// Type check code whenever it changes
 	useEffect(() => {
