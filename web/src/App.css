@@ -1,0 +1,23 @@
+/* Override some Bulma defaults for better code editor experience */
+.textarea {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+  line-height: 1.5;
+  tab-size: 2;
+}
+
+/* Remove default Bulma textarea border radius on the left side */
+.textarea:focus {
+  box-shadow: none;
+  border-color: #3273dc;
+}
+
+/* Ensure the footer doesn't overlap content */
+.footer {
+  background-color: #fafafa;
+}
+
+/* Custom styles for error highlighting */
+.error-highlight {
+  background-color: #ffe5e5;
+  border-bottom: 2px wavy red;
+}
