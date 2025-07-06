@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import MonacoEditor from './MonacoEditor'
 import 'bulma/css/bulma.min.css'
 import './App.css'
 
@@ -16,6 +17,8 @@ const result: string = add(1, 2);`);
   const [errors, setErrors] = useState([]);
   const [wasmModule, setWasmModule] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const monacoRef = useRef(null);
+  const editorRef = useRef(null);
 
   // Load WASM module on component mount
   useEffect(() => {
@@ -43,6 +46,7 @@ const result: string = add(1, 2);`);
       try {
         const result = wasmModule.type_check(code);
         setErrors(result.errors || []);
+        updateEditorMarkers(result.errors || []);
       } catch (error) {
         console.error('Type checking failed:', error);
         setErrors([{
@@ -60,15 +64,50 @@ const result: string = add(1, 2);`);
     return () => clearTimeout(timer);
   }, [code, wasmModule]);
 
-  const getLineNumbers = () => {
-    const lines = code.split('\n');
-    return lines.map((_, index) => index + 1).join('\n');
+  const handleEditorDidMount = (editor, monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+  };
+
+  const updateEditorMarkers = (errors) => {
+    if (!monacoRef.current || !editorRef.current) return;
+
+    const model = editorRef.current.getModel();
+    if (!model) return;
+
+    // Convert errors to Monaco markers
+    const markers = errors.map(error => ({
+      startLineNumber: error.start_line,
+      startColumn: error.start_column,
+      endLineNumber: error.end_line || error.start_line,
+      endColumn: error.end_column || error.start_column + 1,
+      message: error.message,
+      severity: monacoRef.current.MarkerSeverity.Error,
+    }));
+
+    // Set markers
+    monacoRef.current.editor.setModelMarkers(model, 'seal-type-checker', markers);
+  };
+
+  const handleErrorClick = (error) => {
+    if (!editorRef.current) return;
+    
+    // Focus editor and jump to error position
+    editorRef.current.focus();
+    editorRef.current.setPosition({
+      lineNumber: error.start_line,
+      column: error.start_column
+    });
+    editorRef.current.revealPositionInCenter({
+      lineNumber: error.start_line,
+      column: error.start_column
+    });
   };
 
   return (
-    <div className="container is-fluid" style={{ padding: '2rem' }}>
-      <h1 className="title is-1">Seal TypeScript Type Checker</h1>
-      <p className="subtitle">A TypeScript type checker written in Rust, running in your browser via WebAssembly</p>
+    <div className="container is-fluid" style={{ padding: '2rem', maxWidth: '1600px' }}>
+      <h1 className="title is-2">Seal TypeScript</h1>
+      <p className="subtitle is-5">A TypeScript written in Rust, running in your browser via WebAssembly</p>
       
       {isLoading ? (
         <div className="notification is-info">
@@ -79,35 +118,14 @@ const result: string = add(1, 2);`);
           <div className="column is-two-thirds">
             <div className="field">
               <label className="label">TypeScript Code</label>
-              <div className="control">
-                <div style={{ display: 'flex', fontFamily: 'monospace', fontSize: '14px' }}>
-                  <pre 
-                    style={{ 
-                      margin: 0, 
-                      padding: '10px', 
-                      backgroundColor: '#f5f5f5',
-                      color: '#666',
-                      borderRight: '1px solid #ddd',
-                      minWidth: '40px',
-                      textAlign: 'right'
-                    }}
-                  >
-                    {getLineNumbers()}
-                  </pre>
-                  <textarea
-                    className="textarea"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    rows={20}
-                    style={{ 
-                      fontFamily: 'monospace',
-                      fontSize: '14px',
-                      borderRadius: '0 4px 4px 0',
-                      resize: 'vertical'
-                    }}
-                    spellCheck={false}
-                  />
-                </div>
+              <div className="box" style={{ padding: 0, overflow: 'hidden' }}>
+                <MonacoEditor
+                  height="600px"
+                  value={code}
+                  onChange={setCode}
+                  onMount={handleEditorDidMount}
+                  theme="vs-dark"
+                />
               </div>
             </div>
           </div>
@@ -117,23 +135,36 @@ const result: string = add(1, 2);`);
               <label className="label">Type Checking Results</label>
               {errors.length === 0 ? (
                 <div className="notification is-success">
-                  ✓ No type errors found!
+                  <span className="icon">
+                    <i className="fas fa-check-circle"></i>
+                  </span>
+                  <span>No type errors found!</span>
                 </div>
               ) : (
                 <div>
                   <div className="notification is-danger">
-                    {errors.length} error{errors.length > 1 ? 's' : ''} found
+                    <span className="icon">
+                      <i className="fas fa-exclamation-triangle"></i>
+                    </span>
+                    <span>{errors.length} error{errors.length > 1 ? 's' : ''} found</span>
                   </div>
-                  {errors.map((error, index) => (
-                    <div key={index} className="message is-danger" style={{ marginBottom: '1rem' }}>
-                      <div className="message-body">
-                        <p style={{ fontFamily: 'monospace', fontSize: '13px' }}>
-                          <strong>Line {error.start_line}:{error.start_column}</strong>
-                        </p>
-                        <p>{error.message}</p>
+                  <div className="error-list" style={{ maxHeight: '500px', overflowY: 'auto' }}>
+                    {errors.map((error, index) => (
+                      <div 
+                        key={index} 
+                        className="message is-danger error-item" 
+                        style={{ marginBottom: '0.5rem', cursor: 'pointer' }}
+                        onClick={() => handleErrorClick(error)}
+                      >
+                        <div className="message-body" style={{ padding: '0.75rem' }}>
+                          <p style={{ fontFamily: 'monospace', fontSize: '12px', marginBottom: '0.25rem' }}>
+                            <strong>Line {error.start_line}:{error.start_column}</strong>
+                          </p>
+                          <p style={{ fontSize: '14px' }}>{error.message}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -144,7 +175,7 @@ const result: string = add(1, 2);`);
       <footer className="footer" style={{ marginTop: '3rem', padding: '2rem 0' }}>
         <div className="content has-text-centered">
           <p>
-            <strong>Seal</strong> - A TypeScript type checker implementation in Rust
+            <strong>Seal</strong> - A TypeScript implementation in Rust
           </p>
         </div>
       </footer>

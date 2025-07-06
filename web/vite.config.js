@@ -5,11 +5,18 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    exclude: ['seal-cli']
+    exclude: ['seal-cli'],
+    include: ['monaco-editor/esm/vs/editor/editor.worker']
   },
   server: {
     fs: {
       allow: ['..']
     }
+  },
+  define: {
+    global: 'globalThis',
+  },
+  worker: {
+    format: 'es'
   }
 })

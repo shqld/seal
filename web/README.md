@@ -32,14 +32,28 @@ npm run dev
 
 ## Features
 
-- Real-time TypeScript type checking in the browser
-- Error highlighting with line numbers
-- Powered by Seal type checker (written in Rust)
-- No server required - runs entirely via WebAssembly
+- **Monaco Editor Integration**: Full-featured code editor with TypeScript syntax highlighting
+- **Real-time Type Checking**: Instant feedback as you type using Seal type checker
+- **Error Markers**: Visual error indicators directly in the editor
+- **Error Navigation**: Click on errors to jump to the exact location in code
+- **TypeScript Language Support**: Complete TypeScript syntax and IntelliSense
+- **Dark Theme**: Professional dark editor theme for comfortable coding
+- **No Server Required**: Runs entirely in the browser via WebAssembly
 
 ## Development
 
 The application consists of:
 - React frontend with Bulma CSS framework
-- Seal type checker compiled to WebAssembly
+- Monaco Editor for rich code editing experience
+- Seal type checker (Rust) compiled to WebAssembly via seal-cli
 - Vite for development and building
+
+## Architecture
+
+```
+Web App (React + Monaco Editor)
+    ↓ (WebAssembly)
+seal-cli (WASM interface)
+    ↓ (Rust library)
+seal-ty (TypeScript type checker)
+```
