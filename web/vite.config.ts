@@ -8,7 +8,6 @@ export default defineConfig(({ command }) => {
 		base: command === "build" ? "/seal/" : "/",
 		optimizeDeps: {
 			exclude: ["seal-cli"],
-			include: ["monaco-editor/esm/vs/editor/editor.worker"],
 		},
 		server: {
 			fs: {
