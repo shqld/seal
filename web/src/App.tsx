@@ -88,7 +88,7 @@ const result: string = add(1, 2);`;
 	useEffect(() => {
 		const loadWasm = async () => {
 			try {
-				// Dynamic import of the WASM module
+				// @ts-ignore: Ignoring this to prevent errors when running pnpm check before building
 				const wasm = await import("./wasm/seal_cli.js");
 				await wasm.default();
 				setWasmModule(wasm as unknown as WasmModule);
