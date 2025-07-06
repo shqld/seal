@@ -65,7 +65,10 @@ impl<'tcx> FunctionChecker<'tcx> {
 					def: sir::Func {
 						locals: HashMap::new(),
 					},
-					errors: vec![Error::new(ErrorKind::MissingBody)],
+					errors: vec![Error::new(
+						ErrorKind::MissingBody,
+						swc_common::Span::default(),
+					)],
 				};
 			}
 		};

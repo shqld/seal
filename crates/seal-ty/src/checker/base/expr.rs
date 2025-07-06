@@ -19,24 +19,27 @@ impl<'tcx> BaseChecker<'tcx> {
 	pub fn check_expr(&self, expr: &Expr) -> Local<'tcx> {
 		match expr {
 			Expr::Assign(AssignExpr { left, right, .. }) => {
-				let binding = match &left {
+				let (binding_ident, binding_span) = match &left {
 					AssignTarget::Simple(target) => match &target {
-						SimpleAssignTarget::Ident(ident) => ident,
+						SimpleAssignTarget::Ident(ident) => (ident, ident.span),
 						_ => todo!("{:#?}", target),
 					},
 					_ => todo!("{:#?}", left),
 				};
-				let name = Symbol::new(binding.to_id());
+				let name = Symbol::new(binding_ident.to_id());
 				let binding = if let Some(binding) = self.get_binding(&name) {
 					binding
 				} else {
 					// If binding doesn't exist, add an error and return
-					self.add_error(ErrorKind::CannotFindName(name));
+					self.add_error_with_span(ErrorKind::CannotFindName(name), binding_span);
 					return self.add_local(self.constants.err, Value::Err);
 				};
 
 				if !binding.is_assignable {
-					self.add_error(ErrorKind::CannotAssignToConst(name.clone()));
+					self.add_error_with_span(
+						ErrorKind::CannotAssignToConst(name.clone()),
+						binding_span,
+					);
 				}
 
 				let value = self.check_expr(right);
@@ -101,11 +104,11 @@ impl<'tcx> BaseChecker<'tcx> {
 							ty: binding.ty,
 						}
 					} else {
-						self.add_error(ErrorKind::UsedBeforeAssigned(name));
+						self.add_error_with_span(ErrorKind::UsedBeforeAssigned(name), ident.span);
 						self.add_local(self.constants.err, Value::Err)
 					}
 				} else {
-					self.add_error(ErrorKind::CannotFindName(name));
+					self.add_error_with_span(ErrorKind::CannotFindName(name), ident.span);
 					self.add_local(self.constants.err, Value::Err)
 				}
 			}
@@ -141,7 +144,11 @@ impl<'tcx> BaseChecker<'tcx> {
 				}
 			}
 			Expr::Bin(BinExpr {
-				op, left, right, ..
+				op,
+				left,
+				right,
+				span,
+				..
 			}) => {
 				let left_ast = left;
 				let right_ast = right;
@@ -151,7 +158,10 @@ impl<'tcx> BaseChecker<'tcx> {
 				match op {
 					BinaryOp::EqEqEq => {
 						if !self.overlaps(left.ty, right.ty) {
-							self.add_error(ErrorKind::NoOverlap(left.ty, right.ty));
+							self.add_error_with_span(
+								ErrorKind::NoOverlap(left.ty, right.ty),
+								*span,
+							);
 
 							return self.add_local(self.constants.err, Value::Bool(false));
 						}
@@ -167,7 +177,10 @@ impl<'tcx> BaseChecker<'tcx> {
 					BinaryOp::NotEqEq => {
 						// !== operator - strict inequality
 						if !self.overlaps(left.ty, right.ty) {
-							self.add_error(ErrorKind::NoOverlap(left.ty, right.ty));
+							self.add_error_with_span(
+								ErrorKind::NoOverlap(left.ty, right.ty),
+								*span,
+							);
 							return self.add_local(self.constants.err, Value::Bool(true));
 						}
 						self.add_local(
@@ -186,11 +199,14 @@ impl<'tcx> BaseChecker<'tcx> {
 							Value::Binary(crate::sir::BinaryOp::Add, left.id, right.id),
 						),
 						_ => {
-							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
-								BinaryOp::Add,
-								left.ty,
-								right.ty,
-							));
+							self.add_error_with_span(
+								ErrorKind::BinaryOperatorTypeMismatch(
+									BinaryOp::Add,
+									left.ty,
+									right.ty,
+								),
+								*span,
+							);
 							self.add_local(self.constants.err, Value::Err)
 						}
 					},
@@ -200,11 +216,14 @@ impl<'tcx> BaseChecker<'tcx> {
 							Value::Binary(crate::sir::BinaryOp::Sub, left.id, right.id),
 						),
 						_ => {
-							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
-								BinaryOp::Sub,
-								left.ty,
-								right.ty,
-							));
+							self.add_error_with_span(
+								ErrorKind::BinaryOperatorTypeMismatch(
+									BinaryOp::Sub,
+									left.ty,
+									right.ty,
+								),
+								*span,
+							);
 							self.add_local(self.constants.err, Value::Err)
 						}
 					},
@@ -214,11 +233,14 @@ impl<'tcx> BaseChecker<'tcx> {
 							Value::Binary(crate::sir::BinaryOp::Mul, left.id, right.id),
 						),
 						_ => {
-							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
-								BinaryOp::Mul,
-								left.ty,
-								right.ty,
-							));
+							self.add_error_with_span(
+								ErrorKind::BinaryOperatorTypeMismatch(
+									BinaryOp::Mul,
+									left.ty,
+									right.ty,
+								),
+								*span,
+							);
 							self.add_local(self.constants.err, Value::Err)
 						}
 					},
@@ -228,11 +250,14 @@ impl<'tcx> BaseChecker<'tcx> {
 							Value::Binary(crate::sir::BinaryOp::Div, left.id, right.id),
 						),
 						_ => {
-							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
-								BinaryOp::Div,
-								left.ty,
-								right.ty,
-							));
+							self.add_error_with_span(
+								ErrorKind::BinaryOperatorTypeMismatch(
+									BinaryOp::Div,
+									left.ty,
+									right.ty,
+								),
+								*span,
+							);
 							self.add_local(self.constants.err, Value::Err)
 						}
 					},
@@ -247,11 +272,14 @@ impl<'tcx> BaseChecker<'tcx> {
 							Value::Binary(crate::sir::BinaryOp::Lt, left.id, right.id),
 						),
 						_ => {
-							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
-								BinaryOp::Lt,
-								left.ty,
-								right.ty,
-							));
+							self.add_error_with_span(
+								ErrorKind::BinaryOperatorTypeMismatch(
+									BinaryOp::Lt,
+									left.ty,
+									right.ty,
+								),
+								*span,
+							);
 							self.add_local(self.constants.err, Value::Err)
 						}
 					},
@@ -265,11 +293,14 @@ impl<'tcx> BaseChecker<'tcx> {
 							Value::Binary(crate::sir::BinaryOp::LtEq, left.id, right.id),
 						),
 						_ => {
-							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
-								BinaryOp::LtEq,
-								left.ty,
-								right.ty,
-							));
+							self.add_error_with_span(
+								ErrorKind::BinaryOperatorTypeMismatch(
+									BinaryOp::LtEq,
+									left.ty,
+									right.ty,
+								),
+								*span,
+							);
 							self.add_local(self.constants.err, Value::Err)
 						}
 					},
@@ -283,11 +314,14 @@ impl<'tcx> BaseChecker<'tcx> {
 							Value::Binary(crate::sir::BinaryOp::Gt, left.id, right.id),
 						),
 						_ => {
-							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
-								BinaryOp::Gt,
-								left.ty,
-								right.ty,
-							));
+							self.add_error_with_span(
+								ErrorKind::BinaryOperatorTypeMismatch(
+									BinaryOp::Gt,
+									left.ty,
+									right.ty,
+								),
+								*span,
+							);
 							self.add_local(self.constants.err, Value::Err)
 						}
 					},
@@ -301,11 +335,14 @@ impl<'tcx> BaseChecker<'tcx> {
 							Value::Binary(crate::sir::BinaryOp::GtEq, left.id, right.id),
 						),
 						_ => {
-							self.add_error(ErrorKind::BinaryOperatorTypeMismatch(
-								BinaryOp::GtEq,
-								left.ty,
-								right.ty,
-							));
+							self.add_error_with_span(
+								ErrorKind::BinaryOperatorTypeMismatch(
+									BinaryOp::GtEq,
+									left.ty,
+									right.ty,
+								),
+								*span,
+							);
 							self.add_local(self.constants.err, Value::Err)
 						}
 					},
@@ -321,18 +358,20 @@ impl<'tcx> BaseChecker<'tcx> {
 					_ => todo!("{:#?}", op),
 				}
 			}
-			Expr::Member(MemberExpr { obj, prop, .. }) => {
+			Expr::Member(MemberExpr {
+				obj, prop, span, ..
+			}) => {
 				let obj = self.check_expr(obj);
 
 				match &prop {
 					MemberProp::Ident(ident) => {
 						let key = ident.sym.clone();
-						self.handle_property_access(obj, key)
+						self.handle_property_access(obj, key, *span)
 					}
 					MemberProp::Computed(computed) => {
 						// Handle computed property access like arr[0] or obj["key"]
 						let index = self.check_expr(&computed.expr);
-						self.handle_computed_access(obj, index)
+						self.handle_computed_access(obj, index, *span)
 					}
 					_ => todo!("{:#?}", prop),
 				}
@@ -421,20 +460,22 @@ impl<'tcx> BaseChecker<'tcx> {
 						let result = checker.check_body(body);
 
 						for error in result.errors {
-							self.add_error(error.kind);
+							self.add_error_with_span(error.kind, error.span);
 						}
 
 						self.add_local(self.tcx.new_function(result.ty), Value::Closure())
 					}
 				}
 			}
-			Expr::New(NewExpr { callee, args, .. }) => {
+			Expr::New(NewExpr {
+				callee, args, span, ..
+			}) => {
 				let callee = self.check_expr(callee);
 
 				let class = match callee.ty.kind() {
 					TyKind::Class(class) => class,
 					_ => {
-						self.add_error(ErrorKind::NotConstructable);
+						self.add_error_with_span(ErrorKind::NotConstructable, *span);
 						return self.add_local(self.constants.err, Value::Err);
 					}
 				};
@@ -442,7 +483,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				let args = match args {
 					Some(args) => args,
 					None => {
-						self.add_error(ErrorKind::NewOpMissingArgs);
+						self.add_error_with_span(ErrorKind::NewOpMissingArgs, *span);
 						return self.add_local(self.constants.err, Value::Err);
 					}
 				};
@@ -464,7 +505,10 @@ impl<'tcx> BaseChecker<'tcx> {
 					let params = &ctor.params;
 
 					if params.len() != args.len() {
-						self.add_error(ErrorKind::WrongNumArgs(params.len(), args.len()));
+						self.add_error_with_span(
+							ErrorKind::WrongNumArgs(params.len(), args.len()),
+							*span,
+						);
 						return instance;
 					}
 
@@ -475,12 +519,14 @@ impl<'tcx> BaseChecker<'tcx> {
 					}
 				} else if args.len() != 0 {
 					// TS(2554)
-					self.add_error(ErrorKind::WrongNumArgs(0, args.len()));
+					self.add_error_with_span(ErrorKind::WrongNumArgs(0, args.len()), *span);
 				}
 
 				instance
 			}
-			Expr::Call(CallExpr { callee, args, .. }) => {
+			Expr::Call(CallExpr {
+				callee, args, span, ..
+			}) => {
 				let callee = self.check_expr(match callee {
 					Callee::Expr(expr) => expr,
 					_ => todo!("{:#?}", callee),
@@ -489,7 +535,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				let function = match callee.ty.kind() {
 					TyKind::Function(function) => function,
 					_ => {
-						self.add_error(ErrorKind::NotCallable(callee.ty));
+						self.add_error_with_span(ErrorKind::NotCallable(callee.ty), *span);
 						return self.add_local(self.constants.err, Value::Err);
 					}
 				};
@@ -590,19 +636,26 @@ impl<'tcx> BaseChecker<'tcx> {
 		&self,
 		obj: crate::sir::Local<'tcx>,
 		key: swc_atoms::Atom,
+		span: swc_common::Span,
 	) -> crate::sir::Local<'tcx> {
 		match obj.ty.kind() {
 			TyKind::Object(obj_ty) => match obj_ty.get_prop(&key) {
 				Some(ty) => self.add_local(ty, Value::Member(obj.id, key)),
 				None => {
-					self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()));
+					self.add_error_with_span(
+						ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()),
+						span,
+					);
 					self.add_local(self.constants.err, Value::Member(obj.id, key))
 				}
 			},
 			TyKind::Interface(interface) => match interface.fields().get(&key) {
 				Some(ty) => self.add_local(*ty, Value::Member(obj.id, key)),
 				None => {
-					self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()));
+					self.add_error_with_span(
+						ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()),
+						span,
+					);
 					self.add_local(self.constants.err, Value::Member(obj.id, key))
 				}
 			},
@@ -617,7 +670,10 @@ impl<'tcx> BaseChecker<'tcx> {
 						}
 					}
 
-					self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()));
+					self.add_error_with_span(
+						ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()),
+						span,
+					);
 					return self.add_local(self.constants.err, Value::Member(obj.id, key));
 				}
 
@@ -630,21 +686,27 @@ impl<'tcx> BaseChecker<'tcx> {
 				} else if let TyKind::String(_) = obj.ty.kind() {
 					("string", &self.constants.proto_string)
 				} else {
-					self.add_error(ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()));
+					self.add_error_with_span(
+						ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()),
+						span,
+					);
 					return self.add_local(self.constants.err, Value::Member(obj.id, key));
 				};
 
 				if let Some(ty) = props.get(&key) {
 					self.add_local(*ty, Value::Member(obj.id, key))
 				} else {
-					self.add_error(ErrorKind::PropertyDoesNotExist(
-						match name {
-							"number" => self.constants.number,
-							"string" => self.constants.string,
-							_ => unreachable!(),
-						},
-						key.clone(),
-					));
+					self.add_error_with_span(
+						ErrorKind::PropertyDoesNotExist(
+							match name {
+								"number" => self.constants.number,
+								"string" => self.constants.string,
+								_ => unreachable!(),
+							},
+							key.clone(),
+						),
+						span,
+					);
 					self.add_local(self.constants.err, Value::Member(obj.id, key))
 				}
 			}
@@ -655,6 +717,7 @@ impl<'tcx> BaseChecker<'tcx> {
 		&self,
 		obj: crate::sir::Local<'tcx>,
 		index: crate::sir::Local<'tcx>,
+		span: swc_common::Span,
 	) -> crate::sir::Local<'tcx> {
 		match obj.ty.kind() {
 			TyKind::Array(array) => {
@@ -665,10 +728,13 @@ impl<'tcx> BaseChecker<'tcx> {
 						Value::Member(obj.id, swc_atoms::Atom::new("element")),
 					),
 					_ => {
-						self.add_error(ErrorKind::PropertyDoesNotExist(
-							obj.ty,
-							swc_atoms::Atom::new("element"),
-						));
+						self.add_error_with_span(
+							ErrorKind::PropertyDoesNotExist(
+								obj.ty,
+								swc_atoms::Atom::new("element"),
+							),
+							span,
+						);
 						self.add_local(self.constants.err, Value::Err)
 					}
 				}
@@ -678,7 +744,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				match index.ty.kind() {
 					TyKind::String(Some(key)) => {
 						// We know the exact key
-						self.handle_property_access(obj, key.clone())
+						self.handle_property_access(obj, key.clone(), span)
 					}
 					TyKind::String(None) => {
 						// Dynamic string key - we can't statically determine the type
@@ -689,19 +755,22 @@ impl<'tcx> BaseChecker<'tcx> {
 						)
 					}
 					_ => {
-						self.add_error(ErrorKind::PropertyDoesNotExist(
-							obj.ty,
-							swc_atoms::Atom::new("computed"),
-						));
+						self.add_error_with_span(
+							ErrorKind::PropertyDoesNotExist(
+								obj.ty,
+								swc_atoms::Atom::new("computed"),
+							),
+							span,
+						);
 						self.add_local(self.constants.err, Value::Err)
 					}
 				}
 			}
 			_ => {
-				self.add_error(ErrorKind::PropertyDoesNotExist(
-					obj.ty,
-					swc_atoms::Atom::new("computed"),
-				));
+				self.add_error_with_span(
+					ErrorKind::PropertyDoesNotExist(obj.ty, swc_atoms::Atom::new("computed")),
+					span,
+				);
 				self.add_local(self.constants.err, Value::Err)
 			}
 		}

@@ -8,6 +8,7 @@ mod widen;
 
 use std::{cell::RefCell, collections::HashMap, fmt::Debug};
 
+use swc_common::Span;
 use crate::{
 	Ty,
 	context::{TyConstants, TyContext},
@@ -97,7 +98,12 @@ impl<'tcx> BaseChecker<'tcx> {
 	}
 
 	pub fn add_error(&self, err: ErrorKind<'tcx>) {
-		self.errors.borrow_mut().push(Error::new(err));
+		// Default span for backwards compatibility
+		self.add_error_with_span(err, Span::default());
+	}
+
+	pub fn add_error_with_span(&self, err: ErrorKind<'tcx>, span: Span) {
+		self.errors.borrow_mut().push(Error::new(err, span));
 	}
 
 	fn get_binding(&self, name: &Symbol) -> Option<Binding<'tcx>> {

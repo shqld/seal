@@ -1,17 +1,19 @@
 use std::fmt::Display;
 
 use swc_atoms::Atom;
+use swc_common::Span;
 
 use crate::{Ty, TyKind, symbol::Symbol};
 
 #[derive(Debug)]
 pub struct Error<'tcx> {
 	pub kind: ErrorKind<'tcx>,
+	pub span: Span,
 }
 
 impl<'tcx> Error<'tcx> {
-	pub fn new(kind: ErrorKind<'tcx>) -> Self {
-		Self { kind }
+	pub fn new(kind: ErrorKind<'tcx>, span: Span) -> Self {
+		Self { kind, span }
 	}
 }
 

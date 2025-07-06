@@ -59,8 +59,8 @@ impl<'tcx> Checker<'tcx> {
 
 	pub fn check_stmt(&self, stmt: &Stmt) {
 		match stmt {
-			Stmt::Return(_) => {
-				self.add_error(ErrorKind::UnexpectedReturn);
+			Stmt::Return(return_stmt) => {
+				self.add_error_with_span(ErrorKind::UnexpectedReturn, return_stmt.span);
 			}
 			_ => self.base.check_stmt(stmt),
 		}
