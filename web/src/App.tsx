@@ -3,11 +3,36 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import MonacoEditor from "./MonacoEditor";
 import type { TypeCheckError, WasmModule } from "./types";
 import "bulma/css/bulma.min.css";
-import "./App.css";
+// import "./App.css";
 
 const STORAGE_KEY = "seal-typescript-code";
 
+function useTheme() {
+	const [isDark, setIsDark] = useState(
+		() => window.matchMedia("(prefers-color-scheme: dark)").matches
+	);
+
+	useEffect(() => {
+		const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+		const handleChange = (e: MediaQueryListEvent) => setIsDark(e.matches);
+
+		mediaQuery.addEventListener("change", handleChange);
+		return () => mediaQuery.removeEventListener("change", handleChange);
+	}, []);
+
+	useEffect(() => {
+		// Apply theme to document
+		document.documentElement.setAttribute(
+			"data-theme",
+			isDark ? "dark" : "light"
+		);
+	}, [isDark]);
+
+	return isDark;
+}
+
 function App() {
+	const isDark = useTheme();
 	const [code, setCode] = useState(() => {
 		// First, try to load from URL parameters
 		try {
@@ -201,7 +226,7 @@ const result: string = add(1, 2);`;
 	return (
 		<div
 			className="container is-fluid"
-			style={{ padding: "2rem", maxWidth: "1600px" }}
+			style={{ padding: "2rem", maxWidth: "1600px", minHeight: "100vh" }}
 		>
 			<div className="level">
 				<div className="level-left">
@@ -250,7 +275,7 @@ const result: string = add(1, 2);`;
 									value={code}
 									onChange={(value) => setCode(value || "")}
 									onMount={handleEditorDidMount}
-									theme="vs-dark"
+									theme={isDark ? "vs-dark" : "vs"}
 								/>
 							</div>
 						</div>
