@@ -46,7 +46,7 @@ const result: string = add(1, 2);`);
       try {
         const result = wasmModule.type_check(code);
         setErrors(result.errors || []);
-        updateEditorMarkers(result.errors || []);
+        // updateEditorMarkers(result.errors || []);
       } catch (error) {
         console.error('Type checking failed:', error);
         setErrors([{
@@ -68,6 +68,12 @@ const result: string = add(1, 2);`);
     editorRef.current = editor;
     monacoRef.current = monaco;
   };
+
+  useEffect(() => {
+    if (errors.length > 0) {
+      updateEditorMarkers(errors);
+    }
+  }, [errors]);
 
   const updateEditorMarkers = (errors) => {
     if (!monacoRef.current || !editorRef.current) return;
