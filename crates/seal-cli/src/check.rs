@@ -14,15 +14,17 @@ pub struct CheckError {
 }
 
 fn span_to_line_col(source_map: &SourceMap, span: Span) -> (u32, u32, u32, u32) {
+	// Try to lookup char positions, but handle failures gracefully
 	let start_loc = source_map.lookup_char_pos(span.lo);
 	let end_loc = source_map.lookup_char_pos(span.hi);
 
-	(
-		start_loc.line as u32,
-		start_loc.col_display as u32 + 1, // Convert to 1-based column
-		end_loc.line as u32,
-		(end_loc.col_display as u32 + 1).max(start_loc.col_display as u32 + 2), // Ensure end > start
-	)
+	// Validate the results
+	let start_line = start_loc.line.max(1) as u32;
+	let start_col = (start_loc.col_display as u32 + 1).max(1);
+	let end_line = end_loc.line.max(start_loc.line) as u32;
+	let end_col = (end_loc.col_display as u32 + 1).max(start_col + 1);
+
+	(start_line, start_col, end_line, end_col)
 }
 
 pub fn check(source: &str) -> CheckResult {

@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use serde::{Serialize, Deserialize};
 
-use crate::check::{check as check_impl, CheckError};
+use crate::check::check as check_impl;
 
 #[cfg(target_arch = "wasm32")]
 #[derive(Serialize, Deserialize)]

@@ -186,7 +186,7 @@ impl BaseChecker<'_> {
 					if let Some(swc_ecma_ast::Pat::Ident(ident)) = &handler.param {
 						// Check if there's a type annotation - this should be an error
 						if ident.type_ann.is_some() {
-							self.add_error(crate::checker::errors::ErrorKind::CatchParameterCannotHaveTypeAnnotation);
+							self.add_error_with_span(crate::checker::errors::ErrorKind::CatchParameterCannotHaveTypeAnnotation, ident.span);
 						}
 
 						// Always bind the catch parameter as unknown type

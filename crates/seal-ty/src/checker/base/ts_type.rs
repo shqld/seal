@@ -72,7 +72,7 @@ impl<'tcx> BaseChecker<'tcx> {
 
 				self.tcx.new_object(crate::kind::Object { fields })
 			}
-			TsType::TsTypeRef(TsTypeRef { type_name, .. }) => {
+			TsType::TsTypeRef(TsTypeRef { type_name, span, .. }) => {
 				let name = Symbol::new(match type_name {
 					TsEntityName::Ident(ident) => ident.to_id(),
 					TsEntityName::TsQualifiedName(_) => unimplemented!(),
@@ -89,7 +89,7 @@ impl<'tcx> BaseChecker<'tcx> {
 						"Object" => self.constants.object,
 						"RegExp" => self.constants.regexp,
 						_ => {
-							self.add_error(crate::checker::errors::ErrorKind::CannotFindName(name));
+							self.add_error_with_span(crate::checker::errors::ErrorKind::CannotFindName(name), *span);
 							self.constants.err
 						}
 					}

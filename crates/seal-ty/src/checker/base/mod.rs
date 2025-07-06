@@ -8,13 +8,13 @@ mod widen;
 
 use std::{cell::RefCell, collections::HashMap, fmt::Debug};
 
-use swc_common::Span;
 use crate::{
 	Ty,
 	context::{TyConstants, TyContext},
 	sir::{Local, LocalId, Value},
 	symbol::Symbol,
 };
+use swc_common::Span;
 
 use super::errors::{Error, ErrorKind};
 
@@ -97,11 +97,6 @@ impl<'tcx> BaseChecker<'tcx> {
 		checker
 	}
 
-	pub fn add_error(&self, err: ErrorKind<'tcx>) {
-		// Default span for backwards compatibility
-		self.add_error_with_span(err, Span::default());
-	}
-
 	pub fn add_error_with_span(&self, err: ErrorKind<'tcx>, span: Span) {
 		self.errors.borrow_mut().push(Error::new(err, span));
 	}
@@ -132,8 +127,8 @@ impl<'tcx> BaseChecker<'tcx> {
 		}
 	}
 
-	// TODO: remove
-	pub fn raise_type_error(&self, expected: Ty<'tcx>, actual: Ty<'tcx>) {
-		self.add_error(ErrorKind::NotAssignable(expected, actual));
+	// TODO: remove - use add_error_with_span directly
+	pub fn raise_type_error(&self, expected: Ty<'tcx>, actual: Ty<'tcx>, span: Span) {
+		self.add_error_with_span(ErrorKind::NotAssignable(expected, actual), span);
 	}
 }

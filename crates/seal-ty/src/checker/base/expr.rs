@@ -5,6 +5,7 @@ use swc_ecma_ast::{
 	ExprOrSpread, Lit, MemberExpr, MemberProp, NewExpr, Number, ObjectLit, Pat, Prop, PropOrSpread,
 	SeqExpr, SimpleAssignTarget, Str, TsSatisfiesExpr, UnaryOp,
 };
+use swc_common::Spanned;
 
 use crate::{
 	TyKind,
@@ -52,7 +53,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				}
 
 				if !self.satisfies(binding.ty, value.ty) {
-					self.raise_type_error(binding.ty, value.ty);
+					self.raise_type_error(binding.ty, value.ty, right.span());
 				}
 
 				self.set_binding(&name, Some(value), binding.ty, true);
@@ -66,7 +67,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				let actual = value.ty;
 
 				if !self.satisfies(expected, actual) {
-					self.raise_type_error(expected, actual);
+					self.raise_type_error(expected, actual, expr.span());
 				}
 
 				value
@@ -432,7 +433,7 @@ impl<'tcx> BaseChecker<'tcx> {
 							let expected = self.build_ts_type(&return_type.type_ann);
 
 							if !self.satisfies(expected, ret.ty) {
-								self.raise_type_error(expected, ret.ty);
+								self.raise_type_error(expected, ret.ty, body.span());
 							}
 						}
 
@@ -514,7 +515,7 @@ impl<'tcx> BaseChecker<'tcx> {
 
 					for ((_, param), arg) in params.iter().zip(args) {
 						if !self.satisfies(*param, arg.ty) {
-							self.raise_type_error(*param, arg.ty);
+							self.raise_type_error(*param, arg.ty, *span);
 						}
 					}
 				} else if args.len() != 0 {
@@ -550,7 +551,7 @@ impl<'tcx> BaseChecker<'tcx> {
 
 				for ((_, param), arg) in function.params.iter().zip(args.clone()) {
 					if !self.satisfies(*param, arg.ty) {
-						self.raise_type_error(*param, arg.ty);
+						self.raise_type_error(*param, arg.ty, *span);
 					}
 				}
 

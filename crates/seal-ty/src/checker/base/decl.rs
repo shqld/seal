@@ -1,4 +1,5 @@
 use swc_ecma_ast::{ClassDecl, Decl, FnDecl, Pat, VarDeclKind};
+use swc_common::Spanned;
 
 use crate::{
 	TyKind,
@@ -15,7 +16,7 @@ impl BaseChecker<'_> {
 			Decl::Var(var) => {
 				let is_const = match var.kind {
 					VarDeclKind::Var => {
-						self.add_error(ErrorKind::Var);
+						self.add_error_with_span(ErrorKind::Var, var.span);
 
 						// NOTE: 'var' is not allowed, but check the following declarators
 						//       to provide feedbacks on where the variable is referenced
@@ -69,13 +70,13 @@ impl BaseChecker<'_> {
 						}
 
 						if !self.satisfies(binding_ty, actual.ty) {
-							self.raise_type_error(binding_ty, actual.ty);
+							self.raise_type_error(binding_ty, actual.ty, init.span());
 						}
 
 						self.set_binding(&name, Some(actual), binding_ty, !is_const);
 					} else {
 						if is_const {
-							self.add_error(ErrorKind::ConstMissingInit);
+							self.add_error_with_span(ErrorKind::ConstMissingInit, var_declarator.span);
 						}
 
 						self.set_binding(&name, None, binding_ty, !is_const);
@@ -96,7 +97,7 @@ impl BaseChecker<'_> {
 							let ty = match &ident.type_ann {
 								Some(type_ann) => self.build_ts_type(&type_ann.type_ann),
 								None => {
-									self.add_error(ErrorKind::ParamMissingTypeAnn);
+									self.add_error_with_span(ErrorKind::ParamMissingTypeAnn, ident.span);
 									self.constants.err
 								}
 							};
@@ -119,7 +120,7 @@ impl BaseChecker<'_> {
 				let result = checker.check_function(function);
 
 				for error in result.errors {
-					self.add_error(error.kind);
+					self.add_error_with_span(error.kind, error.span);
 				}
 
 				let ty = self.tcx.new_function(result.ty);
@@ -138,7 +139,7 @@ impl BaseChecker<'_> {
 				let result = checker.check_class(class);
 
 				for error in result.errors {
-					self.add_error(error.kind);
+					self.add_error_with_span(error.kind, error.span);
 				}
 
 				let ty = self.tcx.new_class(result.ty);

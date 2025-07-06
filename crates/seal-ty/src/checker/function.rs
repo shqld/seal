@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::{cell::Cell, ops::Deref};
 
 use swc_ecma_ast::{BlockStmt, Function, ReturnStmt, Stmt};
+use swc_common::Spanned;
 
 use super::{base::BaseChecker, errors::Error};
 
@@ -82,7 +83,7 @@ impl<'tcx> FunctionChecker<'tcx> {
 		}
 
 		if !matches!(self.ret.kind(), TyKind::Void) && !self.has_returned.get() {
-			self.add_error(ErrorKind::UnexpectedVoid);
+			self.add_error_with_span(ErrorKind::UnexpectedVoid, body.span);
 		}
 
 		FunctionCheckerResult {
@@ -100,17 +101,17 @@ impl<'tcx> FunctionChecker<'tcx> {
 
 	pub fn check_stmt(&self, stmt: &Stmt) {
 		match stmt {
-			Stmt::Return(ReturnStmt { arg, .. }) => {
+			Stmt::Return(ReturnStmt { arg, span, .. }) => {
 				let expected = self.ret;
 
 				if let Some(arg) = arg {
 					let actual = self.check_expr(arg);
 
 					if !self.satisfies(expected, actual.ty) {
-						self.raise_type_error(expected, actual.ty);
+						self.raise_type_error(expected, actual.ty, arg.span());
 					}
 				} else if !matches!(expected.kind(), TyKind::Void) {
-					self.add_error(ErrorKind::UnexpectedVoid);
+					self.add_error_with_span(ErrorKind::UnexpectedVoid, *span);
 				}
 
 				self.has_returned.set(true);
