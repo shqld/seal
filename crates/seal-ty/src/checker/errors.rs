@@ -69,6 +69,8 @@ pub enum ErrorKind<'tcx> {
 	CannotAssignToConst(Symbol),
 	/// Custom error for binary operator type mismatch
 	BinaryOperatorTypeMismatch(swc_ecma_ast::BinaryOp, Ty<'tcx>, Ty<'tcx>),
+	/// Custom error for extending non-class type
+	ExtendsNonClass(Ty<'tcx>),
 }
 
 impl Display for ErrorKind<'_> {
@@ -212,6 +214,9 @@ impl Display for ErrorKind<'_> {
 					f,
 					"Operator '{op_str}' cannot be applied to types '{left}' and '{right}'."
 				)
+			}
+			ExtendsNonClass(ty) => {
+				write!(f, "Class extends value '{ty}' which is not a constructor function type.")
 			}
 		}
 	}

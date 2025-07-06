@@ -166,6 +166,7 @@ impl<'tcx> Union<'tcx> {
 	}
 }
 
+// TODO: remove this and use Interface instead
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Object<'tcx> {
 	pub fields: BTreeMap<Atom, Ty<'tcx>>,
@@ -185,6 +186,7 @@ impl<'tcx> Object<'tcx> {
 pub struct Class<'tcx> {
 	ctor: Option<Function<'tcx>>,
 	interface: Rc<Interface<'tcx>>,
+	parent: Option<Ty<'tcx>>,
 }
 
 impl<'tcx> Deref for Class<'tcx> {
@@ -200,6 +202,20 @@ impl<'tcx> Class<'tcx> {
 		Self {
 			ctor,
 			interface: interface.clone(),
+			parent: None,
+		}
+	}
+
+	// TODO: each class ty should have a set referencing to all ancestors
+	pub fn new_with_parent(
+		ctor: Option<Function<'tcx>>,
+		interface: Rc<Interface<'tcx>>,
+		parent: Ty<'tcx>,
+	) -> Self {
+		Self {
+			ctor,
+			interface: interface.clone(),
+			parent: Some(parent),
 		}
 	}
 
@@ -209,6 +225,10 @@ impl<'tcx> Class<'tcx> {
 
 	pub fn interface(&self) -> Rc<Interface<'tcx>> {
 		self.interface.clone()
+	}
+
+	pub fn parent(&self) -> Option<Ty<'tcx>> {
+		self.parent
 	}
 }
 

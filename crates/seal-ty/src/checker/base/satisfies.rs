@@ -7,7 +7,7 @@ impl<'tcx> BaseChecker<'tcx> {
 	pub fn satisfies(&self, expected: Ty<'tcx>, actual: Ty<'tcx>) -> bool {
 		use crate::TyKind::*;
 
-		match (expected.kind(), actual.kind()) {
+		let result = match (expected.kind(), actual.kind()) {
 			// to prevent cascading errors
 			(Err, _) | (_, Err) => true,
 			// never type is the bottom type - nothing can be assigned to it except never itself
@@ -56,8 +56,80 @@ impl<'tcx> BaseChecker<'tcx> {
 			// Object literal should satisfy Object type
 			(Interface(expected), Object(_)) if expected.name().name() == "Object" => true,
 
+			// Interface inheritance checking
+			(Interface(expected_interface), Interface(actual_interface)) => {
+				// First check if names match - this handles exact type matches
+				if expected_interface.name() == actual_interface.name() {
+					return true;
+				}
+
+				// For different interface names, use structural typing:
+				// Check if actual interface has all properties of expected interface
+				for (prop, expected_ty) in expected_interface.fields() {
+					match actual_interface.get_prop(prop) {
+						Some(actual_ty) => {
+							if !self.satisfies(*expected_ty, actual_ty) {
+								return false;
+							}
+						}
+						None => return false,
+					}
+				}
+
+				// If expected interface has no properties, the structural check would pass
+				// but we should only allow this if the interfaces are related through inheritance
+				// For now, we'll be strict and require same names for empty interfaces
+				if expected_interface.fields().is_empty() && actual_interface.fields().is_empty() {
+					// Both are empty but different names - only allow if there's an inheritance relationship
+					// For simplicity, we'll return false to maintain existing behavior
+					false
+				} else {
+					true
+				}
+			}
+
+			// Class inheritance checking
+			(Class(_), Class(actual_class)) => {
+				// Check if actual is same as expected
+				if expected == actual {
+					return true;
+				}
+				// Check if actual extends expected (walk up the inheritance chain)
+				let mut current = actual_class.parent();
+				// TODO: each class ty should have a set referencing to all ancestors
+				while let Some(parent_ty) = current {
+					if parent_ty == expected {
+						return true;
+					}
+					// Continue up the chain if parent is also a class
+					current = match parent_ty.kind() {
+						Class(parent_class) => parent_class.parent(),
+						_ => None,
+					};
+				}
+				false
+			}
+
+			// Instance of class satisfies parent class
+			(Class(expected_class), Interface(actual_interface)) => {
+				// An interface satisfies a class if it has all the properties of that class
+				for (prop, expected_ty) in expected_class.fields() {
+					match actual_interface.get_prop(prop) {
+						Some(actual_ty) => {
+							if !self.satisfies(*expected_ty, actual_ty) {
+								return false;
+							}
+						}
+						None => return false,
+					}
+				}
+				true
+			}
+
 			_ => expected == actual,
-		}
+		};
+
+		result
 	}
 
 	pub fn overlaps(&self, left: Ty<'tcx>, right: Ty<'tcx>) -> bool {

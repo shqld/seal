@@ -9,7 +9,7 @@ use super::errors::{Error, ErrorKind};
 use super::function::FunctionChecker;
 
 use crate::sir::{self, Value};
-use crate::{context::TyContext, symbol::Symbol};
+use crate::symbol::Symbol;
 
 pub struct ClassCheckerResult<'tcx> {
 	pub ty: crate::kind::Class<'tcx>,
@@ -33,8 +33,8 @@ impl<'tcx> Deref for ClassChecker<'tcx> {
 }
 
 impl<'tcx> ClassChecker<'tcx> {
-	pub fn new(tcx: &'tcx TyContext<'tcx>, name: &Symbol) -> ClassChecker<'tcx> {
-		let base = BaseChecker::new(tcx);
+	pub fn new_with_parent(parent: &BaseChecker<'tcx>, name: &Symbol) -> ClassChecker<'tcx> {
+		let base = parent.new_scoped_checker();
 
 		ClassChecker {
 			base,
@@ -43,9 +43,35 @@ impl<'tcx> ClassChecker<'tcx> {
 	}
 
 	pub fn check_class(self, class: &Class) -> ClassCheckerResult<'tcx> {
+		// Check for parent class
+		let parent: Option<crate::Ty<'tcx>> = if let Some(super_class) = &class.super_class {
+			// Evaluate the super class expression
+			let parent_local = self.check_expr(super_class);
+			// The parent should be a class type
+			match parent_local.ty.kind() {
+				crate::TyKind::Class(_) => Some(parent_local.ty),
+				_ => {
+					self.add_error(ErrorKind::ExtendsNonClass(parent_local.ty));
+					None
+				}
+			}
+		} else {
+			None
+		};
+
 		let mut ctor = None;
 		let mut field_tys = BTreeMap::new();
 		let mut methods = vec![];
+
+		// If there's a parent class, inherit its fields
+		if let Some(parent_ty) = parent {
+			if let crate::TyKind::Class(parent_class) = parent_ty.kind() {
+				// Copy parent fields to child
+				for (key, ty) in parent_class.fields() {
+					field_tys.insert(key.clone(), *ty);
+				}
+			}
+		}
 
 		for member in &class.body {
 			match member {
@@ -135,10 +161,18 @@ impl<'tcx> ClassChecker<'tcx> {
 		};
 
 		ClassCheckerResult {
-			ty: crate::kind::Class::new(
-				ctor_ty,
-				Rc::new(crate::kind::Interface::new(self.name.clone(), field_tys)),
-			),
+			ty: if let Some(parent_ty) = parent {
+				crate::kind::Class::new_with_parent(
+					ctor_ty,
+					Rc::new(crate::kind::Interface::new(self.name.clone(), field_tys)),
+					parent_ty,
+				)
+			} else {
+				crate::kind::Class::new(
+					ctor_ty,
+					Rc::new(crate::kind::Interface::new(self.name.clone(), field_tys)),
+				)
+			},
 			def: sir::Class { ctor, methods },
 			errors: self.base.errors.into_inner(),
 		}

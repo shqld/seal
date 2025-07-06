@@ -10,7 +10,7 @@ pass!(
 );
 
 fail!(
-	empty_class_with_shape_mismatch,
+	empty_classes_nominally_incompatible,
 	r#"
         class A {}
         class B {}
@@ -146,6 +146,25 @@ pass!(
         animal satisfies Animal;
         animal.name satisfies string;
         animal.age satisfies number;
+    "#
+);
+
+pass!(
+	class_inheritance_basic,
+	r#"
+        class Animal {
+            name: string = "default";
+        }
+        
+        class Dog extends Animal {
+            breed: string = "mixed";
+        }
+        
+        let dog = new Dog();
+        dog satisfies Dog;
+        dog satisfies Animal;
+        dog.name satisfies string;
+        dog.breed satisfies string;
     "#
 );
 

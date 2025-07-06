@@ -134,7 +134,7 @@ impl BaseChecker<'_> {
 			Decl::Class(ClassDecl { ident, class, .. }) => {
 				let name = Symbol::new(ident.to_id());
 
-				let checker = ClassChecker::new(self.tcx, &name);
+				let checker = ClassChecker::new_with_parent(self, &name);
 				let result = checker.check_class(class);
 
 				for error in result.errors {
