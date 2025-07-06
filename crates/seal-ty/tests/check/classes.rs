@@ -199,3 +199,14 @@ fail!(
     "#,
 	&["Property 'pin' does not exist on type 'BankAccount'."]
 );
+
+pass!(
+	class_property_literal,
+	r#"
+        class Person {
+            name: 'John Doe';
+            age: 42;
+            married: false;
+        }
+    "#
+);

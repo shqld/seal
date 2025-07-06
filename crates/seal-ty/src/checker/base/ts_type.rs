@@ -55,6 +55,18 @@ impl<'tcx> BaseChecker<'tcx> {
 			},
 			TsType::TsLitType(TsLitType { lit, .. }) => match lit {
 				TsLit::Str(str) => self.tcx.new_const_string(str.value.clone()),
+				TsLit::Number(num) => {
+					if num.value.fract() != 0.0 {
+						self.add_error_with_span(
+							crate::checker::errors::ErrorKind::InvalidNumberLiteral(num.value),
+							num.span,
+						);
+						self.constants.number
+					} else {
+						self.tcx.new_const_number(num.value as i64)
+					}
+				}
+				TsLit::Bool(bool) => self.tcx.new_const_boolean(bool.value),
 				_ => todo!("{:#?}", lit),
 			},
 			TsType::TsTypeLit(TsTypeLit { members, .. }) => {
@@ -72,7 +84,9 @@ impl<'tcx> BaseChecker<'tcx> {
 
 				self.tcx.new_object(crate::kind::Object { fields })
 			}
-			TsType::TsTypeRef(TsTypeRef { type_name, span, .. }) => {
+			TsType::TsTypeRef(TsTypeRef {
+				type_name, span, ..
+			}) => {
 				let name = Symbol::new(match type_name {
 					TsEntityName::Ident(ident) => ident.to_id(),
 					TsEntityName::TsQualifiedName(_) => unimplemented!(),
@@ -89,7 +103,10 @@ impl<'tcx> BaseChecker<'tcx> {
 						"Object" => self.constants.object,
 						"RegExp" => self.constants.regexp,
 						_ => {
-							self.add_error_with_span(crate::checker::errors::ErrorKind::CannotFindName(name), *span);
+							self.add_error_with_span(
+								crate::checker::errors::ErrorKind::CannotFindName(name),
+								*span,
+							);
 							self.constants.err
 						}
 					}

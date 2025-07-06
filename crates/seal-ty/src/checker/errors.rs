@@ -73,6 +73,7 @@ pub enum ErrorKind<'tcx> {
 	BinaryOperatorTypeMismatch(swc_ecma_ast::BinaryOp, Ty<'tcx>, Ty<'tcx>),
 	/// Custom error for extending non-class type
 	ExtendsNonClass(Ty<'tcx>),
+	InvalidNumberLiteral(f64),
 }
 
 impl Display for ErrorKind<'_> {
@@ -230,6 +231,9 @@ impl Display for ErrorKind<'_> {
 					f,
 					"Class extends value '{ty}' which is not a constructor function type."
 				)
+			}
+			InvalidNumberLiteral(value) => {
+				write!(f, "Invalid number literal: {value}.")
 			}
 		}
 	}
