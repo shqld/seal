@@ -141,17 +141,11 @@ const result: string = add(1, 2);`);
               <label className="label">Type Checking Results</label>
               {errors.length === 0 ? (
                 <div className="notification is-success">
-                  <span className="icon">
-                    <i className="fas fa-check-circle"></i>
-                  </span>
                   <span>No type errors found!</span>
                 </div>
               ) : (
                 <div>
                   <div className="notification is-danger">
-                    <span className="icon">
-                      <i className="fas fa-exclamation-triangle"></i>
-                    </span>
                     <span>{errors.length} error{errors.length > 1 ? 's' : ''} found</span>
                   </div>
                   <div className="error-list" style={{ maxHeight: '500px', overflowY: 'auto' }}>
