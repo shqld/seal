@@ -1,11 +1,24 @@
 import Editor from '@monaco-editor/react'
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
+import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 
-// Configure Monaco Editor Workers
 self.MonacoEnvironment = {
-  getWorkerUrl() {
-    return './editor.worker.bundle.js'
+  getWorker(_, label) {
+    switch (label) {
+      case 'json':
+        return new jsonWorker();
+      case "typescript":
+      case "javascript":
+        return new tsWorker();
+      case "editorWorkerService":
+        return new editorWorker();
+      default:
+        throw new Error(`Unknown worker label: ${label}`);
+    }
   }
 }
+
 
 function MonacoEditor({ value, onChange, onMount, theme = 'vs-dark', ...props }) {
   return (
