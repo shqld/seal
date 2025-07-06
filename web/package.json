@@ -4,11 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "./build-wasm.sh && vite",
+    "build": "./build-wasm.sh && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "build:wasm": "cd ../crates/seal-cli && wasm-pack build --target web --out-dir ../../web/src/wasm"
+    "preview": "vite preview"
   },
   "dependencies": {
     "react": "^19.1.0",
