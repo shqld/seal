@@ -131,4 +131,33 @@ impl<'tcx> BaseChecker<'tcx> {
 	pub fn raise_type_error(&self, expected: Ty<'tcx>, actual: Ty<'tcx>, span: Span) {
 		self.add_error_with_span(ErrorKind::NotAssignable(expected, actual), span);
 	}
+
+	pub fn raise_object_type_error(&self, expected: Ty<'tcx>, actual: Ty<'tcx>, span: Span) {
+		// For object literal assignment errors, widen number/boolean literals to their base types
+		// but keep string literals for proper error messages
+		let widened_actual = self.widen_object_for_error(actual);
+		self.add_error_with_span(ErrorKind::NotAssignable(expected, widened_actual), span);
+	}
+
+	fn widen_object_for_error(&self, ty: Ty<'tcx>) -> Ty<'tcx> {
+		use crate::TyKind;
+		use std::collections::BTreeMap;
+
+		match ty.kind() {
+			TyKind::Object(obj) => {
+				let widened_fields = obj.fields.iter().map(|(key, ty)| {
+					let widened_ty = match ty.kind() {
+						TyKind::Number(_) => self.constants.number,  // 30 -> number
+						TyKind::Boolean(_) => self.constants.boolean, // true -> boolean
+						TyKind::String(_) => *ty,  // Keep string literals like "Alice"
+						_ => *ty,
+					};
+					(key.clone(), widened_ty)
+				}).collect::<BTreeMap<_, _>>();
+				
+				self.tcx.new_object(crate::kind::Object::new(widened_fields))
+			}
+			_ => ty,
+		}
+	}
 }

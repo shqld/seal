@@ -131,8 +131,12 @@ impl<'tcx> BaseChecker<'tcx> {
 				true
 			}
 
-			// Object structural compatibility with widened property types
+			// Object structural compatibility with excess property checking
 			(Object(expected_obj), Object(actual_obj)) => {
+				if expected_obj.fields.len() != actual_obj.fields.len() {
+					return false;
+				}
+
 				// For different interface names, use structural typing:
 				// Check if actual interface has all properties of expected interface
 				for (prop, expected_ty) in expected_obj.fields() {
@@ -146,16 +150,7 @@ impl<'tcx> BaseChecker<'tcx> {
 					}
 				}
 
-				// If expected interface has no properties, the structural check would pass
-				// but we should only allow this if the interfaces are related through inheritance
-				// For now, we'll be strict and require same names for empty interfaces
-				if expected_obj.fields().is_empty() && actual_obj.fields().is_empty() {
-					// Both are empty but different names - only allow if there's an inheritance relationship
-					// For simplicity, we'll return false to maintain existing behavior
-					false
-				} else {
-					true
-				}
+				true
 			}
 			_ => expected == actual,
 		};

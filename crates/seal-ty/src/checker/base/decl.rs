@@ -70,7 +70,11 @@ impl BaseChecker<'_> {
 						}
 
 						if !self.satisfies(binding_ty, actual.ty) {
-							self.raise_type_error(binding_ty, actual.ty, init.span());
+							// Use special object type error for object literal assignments
+							match actual.ty.kind() {
+								TyKind::Object(_) => self.raise_object_type_error(binding_ty, actual.ty, init.span()),
+								_ => self.raise_type_error(binding_ty, actual.ty, init.span()),
+							}
 						}
 
 						self.set_binding(&name, Some(actual), binding_ty, !is_const);
