@@ -1,7 +1,8 @@
-import Editor from '@monaco-editor/react'
+import Editor, { useMonaco } from '@monaco-editor/react'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
+import { useEffect } from 'react';
 
 self.MonacoEnvironment = {
   getWorker(_, label) {
@@ -21,9 +22,30 @@ self.MonacoEnvironment = {
 
 
 function MonacoEditor({ value, onChange, onMount, theme = 'vs-dark', ...props }) {
+  const monaco = useMonaco();
+
+  useEffect(() => {
+    monaco?.languages.typescript.typescriptDefaults.setModeConfiguration({ 
+        completionItems: true,
+        hovers: true,
+        documentSymbols: false,
+        definitions: false,
+        references: false,
+        documentHighlights: false,
+        rename: false,
+        diagnostics: false,
+        documentRangeFormattingEdits: false,
+        signatureHelp: false,
+        onTypeFormattingEdits: false,
+        codeActions: false,
+        inlayHints: false,
+    })
+  }, [monaco]);
+
+
   return (
     <Editor
-      defaultLanguage="typescript"
+      language="typescript"
       value={value}
       onChange={onChange}
       onMount={onMount}
