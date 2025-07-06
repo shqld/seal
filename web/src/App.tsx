@@ -186,12 +186,12 @@ const result: string = add(1, 2);`;
 		monacoRef.current = monaco;
 	};
 
-    const [prevErrors, setPrevErrors] = useState<TypeCheckError[]>(errors);
+	const [prevErrors, setPrevErrors] = useState<TypeCheckError[]>(errors);
 
-    if (prevErrors !== errors) {
-        setPrevErrors(errors);
-        updateEditorMarkers(errors);
-    }
+	if (prevErrors !== errors) {
+		setPrevErrors(errors);
+		updateEditorMarkers(errors);
+	}
 
 	const handleErrorClick = (error: TypeCheckError) => {
 		if (!editorRef.current) return;
