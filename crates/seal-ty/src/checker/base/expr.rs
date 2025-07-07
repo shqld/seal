@@ -99,10 +99,19 @@ impl<'tcx> BaseChecker<'tcx> {
 					// Regular expressions are represented as RegExp objects
 					self.add_local(self.constants.regexp, Value::Regex(regex.exp.clone()))
 				}
+				Lit::Null(_) => {
+					// null literal
+					self.add_local(self.constants.null, Value::Null)
+				}
 				_ => todo!("{:#?}", lit),
 			},
 			Expr::Ident(ident) => {
 				let name = Symbol::new(ident.to_id());
+
+				// Handle built-in identifiers
+				if ident.sym.as_str() == "undefined" {
+					return self.add_local(self.constants.undefined, Value::Undefined);
+				}
 
 				if let Some(binding) = self.get_binding(&name) {
 					// TODO: if in closure, this should be Value::Var
@@ -143,11 +152,30 @@ impl<'tcx> BaseChecker<'tcx> {
 						)
 					}
 					UnaryOp::Minus => {
-						// Unary minus - converts to number
-						self.add_local(
-							self.constants.number,
-							Value::Unary(crate::sir::UnaryOp::Minus, value.id),
-						)
+						// Unary minus - preserves literal type for constants
+						match value.ty.kind() {
+							TyKind::Number(Some(n)) => {
+								// Preserve literal type: -42 becomes literal type -42
+								self.add_local(
+									self.tcx.new_const_number(-n),
+									Value::Int(-n),
+								)
+							}
+							TyKind::Number(None) => {
+								// Generic number stays generic
+								self.add_local(
+									self.constants.number,
+									Value::Unary(crate::sir::UnaryOp::Minus, value.id),
+								)
+							}
+							_ => {
+								// Invalid operand - should be an error but continue
+								self.add_local(
+									self.constants.number,
+									Value::Unary(crate::sir::UnaryOp::Minus, value.id),
+								)
+							}
+						}
 					}
 					_ => todo!("{:#?}", unary),
 				}

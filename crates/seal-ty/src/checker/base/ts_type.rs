@@ -20,6 +20,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				TsKeywordTypeKind::TsNeverKeyword => self.constants.never,
 				TsKeywordTypeKind::TsUnknownKeyword => self.constants.unknown,
 				TsKeywordTypeKind::TsNullKeyword => self.constants.null,
+				TsKeywordTypeKind::TsUndefinedKeyword => self.constants.undefined,
 				_ => todo!("{:#?}", keyword),
 			},
 			TsType::TsFnOrConstructorType(fn_or_constructor) => match fn_or_constructor {

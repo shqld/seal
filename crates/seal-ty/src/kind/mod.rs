@@ -35,6 +35,7 @@ pub enum TyKind<'tcx> {
 	Never,
 	Unknown,
 	Null,
+	Undefined,
 	Guard(Symbol, Ty<'tcx>),
 }
 
@@ -120,6 +121,7 @@ impl Display for TyKind<'_> {
 			TyKind::Never => write!(f, "never",),
 			TyKind::Unknown => write!(f, "unknown"),
 			TyKind::Null => write!(f, "null"),
+			TyKind::Undefined => write!(f, "undefined"),
 			TyKind::Guard(_, _) => write!(f, "<guard>"),
 		}
 	}

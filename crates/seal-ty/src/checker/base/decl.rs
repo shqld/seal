@@ -155,6 +155,14 @@ impl BaseChecker<'_> {
 					false,
 				);
 			}
+			Decl::TsTypeAlias(type_alias) => {
+				// Type alias declarations: type Status = "loading" | "success" | "error"
+				let name = Symbol::new(type_alias.id.to_id());
+				let aliased_type = self.build_ts_type(&type_alias.type_ann);
+				
+				// Store the type alias as a binding so it can be referenced by name
+				self.set_binding(&name, None, aliased_type, false);
+			}
 			_ => todo!("{:#?}", decl),
 		}
 	}

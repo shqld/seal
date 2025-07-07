@@ -8,6 +8,7 @@ mod classes;
 mod control_flow;
 mod error_handling;
 mod functions;
+mod literals;
 mod loops;
 mod objects;
 mod operators;

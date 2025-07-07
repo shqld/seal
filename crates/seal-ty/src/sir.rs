@@ -69,7 +69,8 @@ pub enum Value {
 	Param,
 	Ret,
 	Var,
-	// TODO: null?
+	Null,
+	Undefined,
 	Err,
 	Ref(DefId),
 	Bool(bool),
