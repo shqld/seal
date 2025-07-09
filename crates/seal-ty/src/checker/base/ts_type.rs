@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use swc_ecma_ast::{
 	TsEntityName, TsFnOrConstructorType, TsFnParam, TsKeywordTypeKind, TsLit, TsLitType, TsType,
-	TsTypeLit, TsTypeRef, TsUnionOrIntersectionType,
+	TsTypeLit, TsTypeOperator, TsTypeRef, TsTupleType, TsUnionOrIntersectionType,
 };
 
 use crate::{Ty, TyKind, symbol::Symbol};
@@ -118,6 +118,23 @@ impl<'tcx> BaseChecker<'tcx> {
 				self.tcx.new_array(element)
 			}
 			TsType::TsParenthesizedType(paren) => self.build_ts_type(&paren.type_ann),
+			TsType::TsTupleType(TsTupleType { elem_types, .. }) => {
+				let elements = elem_types
+					.iter()
+					.map(|elem| self.build_ts_type(&elem.ty))
+					.collect();
+				self.tcx.new_tuple(elements)
+			}
+			TsType::TsTypeOperator(TsTypeOperator { op, type_ann, .. }) => {
+				match op.as_str() {
+					"readonly" => {
+						// For readonly, we just return the inner type
+						// In a more complete implementation, we'd track readonly-ness
+						self.build_ts_type(type_ann)
+					}
+					_ => todo!("Type operator: {}", op),
+				}
+			}
 			_ => todo!("{:#?}", tstype),
 		}
 	}

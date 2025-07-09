@@ -111,21 +111,29 @@ impl Display for ErrorKind<'_> {
 			}
 			// TS(2322)
 			NotAssignable(expected, actual) => {
-				// Handle literal string types specially
-				if !matches!(expected.kind(), String(_)) && matches!(actual.kind(), String(Some(_)))
-				{
-					write!(f, "Type 'string' is not assignable to type '{expected}'.")
-				} else if !matches!(expected.kind(), Number(_))
-					&& matches!(actual.kind(), Number(Some(_)))
-				{
-					write!(f, "Type 'number' is not assignable to type '{expected}'.")
-				} else if !matches!(expected.kind(), Boolean(_))
-					&& matches!(actual.kind(), Boolean(Some(_)))
-				{
-					write!(f, "Type 'boolean' is not assignable to type '{expected}'.")
-				} else {
-					write!(f, "Type '{actual}' is not assignable to type '{expected}'.")
-				}
+				// For literal types, show the literal if the expected type is compatible (e.g., unions containing literals)
+				// Otherwise show the widened type for better error messages
+				let actual = match (expected.kind(), actual.kind()) {
+					// If expected is a union and actual is a literal, show the literal
+					(Union(_), String(Some(_)) | Number(Some(_)) | Boolean(Some(_))) => {
+						format!("{}", actual)
+					}
+
+					// If expected is a literal and actual is a literal, show the literal
+					(String(Some(_)), String(Some(_))) => format!("{}", actual),
+					(Number(Some(_)), Number(Some(_))) => format!("{}", actual),
+					(Boolean(Some(_)), Boolean(Some(_))) => format!("{}", actual),
+
+					// For other cases, widen literal types for better error messages
+					(_, String(Some(_))) => "string".to_string(),
+					(_, Number(Some(_))) => "number".to_string(),
+					(_, Boolean(Some(_))) => "boolean".to_string(),
+
+					// For non-literal types, use the actual type
+					_ => format!("{}", actual),
+				};
+
+				write!(f, "Type '{actual}' is not assignable to type '{expected}'.")
 			}
 			// TS(2324)
 			PropertyMissing(prop, ty) => {

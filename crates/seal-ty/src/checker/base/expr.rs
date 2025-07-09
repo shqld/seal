@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use swc_common::Spanned;
 use swc_ecma_ast::{
 	AssignExpr, AssignTarget, BinExpr, BinaryOp, BlockStmtOrExpr, Bool, CallExpr, Callee, Expr,
 	ExprOrSpread, Lit, MemberExpr, MemberProp, NewExpr, Number, ObjectLit, Pat, Prop, PropOrSpread,
-	SeqExpr, SimpleAssignTarget, Str, TsSatisfiesExpr, UnaryOp,
+	SeqExpr, SimpleAssignTarget, Str, TsConstAssertion, TsSatisfiesExpr, UnaryOp,
 };
-use swc_common::Spanned;
 
 use crate::{
 	TyKind,
@@ -156,10 +156,7 @@ impl<'tcx> BaseChecker<'tcx> {
 						match value.ty.kind() {
 							TyKind::Number(Some(n)) => {
 								// Preserve literal type: -42 becomes literal type -42
-								self.add_local(
-									self.tcx.new_const_number(-n),
-									Value::Int(-n),
-								)
+								self.add_local(self.tcx.new_const_number(-n), Value::Int(-n))
 							}
 							TyKind::Number(None) => {
 								// Generic number stays generic
@@ -666,6 +663,45 @@ impl<'tcx> BaseChecker<'tcx> {
 			Expr::Paren(paren) => {
 				// Parenthesized expression - just evaluate the inner expression
 				self.check_expr(&paren.expr)
+			}
+			Expr::TsConstAssertion(TsConstAssertion { expr, .. }) => {
+				// TypeScript const assertion - prevents widening of literal types
+				// For arrays, this means keeping literal types of elements
+				match expr.as_ref() {
+					Expr::Array(array) => {
+						let elements: Vec<_> = array
+							.elems
+							.iter()
+							.filter_map(|elem| elem.as_ref())
+							.map(|ExprOrSpread { expr, spread }| {
+								if spread.is_some() {
+									todo!("spread in array literal")
+								}
+								self.check_expr(expr)
+							})
+							.collect();
+
+						if elements.is_empty() {
+							// Empty array with const assertion
+							self.add_local(
+								self.tcx.new_array(self.constants.never),
+								Value::Array(vec![]),
+							)
+						} else {
+							// With const assertion, create a tuple type instead of array type
+							// This preserves the exact structure: ["pending", "done"] as const -> ["pending", "done"]
+							let element_types: Vec<_> = elements.iter().map(|e| e.ty).collect();
+
+							self.add_local(
+								self.tcx.new_tuple(element_types),
+								Value::Array(elements.into_iter().map(|e| e.id).collect()),
+							)
+						}
+					}
+					// For other expressions with const assertion, just check normally
+					// In a more complete implementation, we'd handle objects differently too
+					_ => self.check_expr(expr),
+				}
 			}
 			_ => todo!("{:#?}", expr),
 		}

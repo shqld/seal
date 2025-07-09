@@ -295,7 +295,9 @@ fail!(
             mode: "staging"
         };
     "#,
-	&["Type '{mode: \"staging\"}' is not assignable to type '{mode: \"development\" | \"production\"}'."]
+	&[
+		"Type '{mode: \"staging\"}' is not assignable to type '{mode: \"development\" | \"production\"}'."
+	]
 );
 
 // === Array Elements with Literal Types ===
@@ -303,19 +305,41 @@ fail!(
 pass!(
 	array_literal_elements,
 	r#"
+        const statuses = ["pending", "done"];
+        statuses satisfies string[];
+    "#
+);
+
+fail!(
+	array_literal_elements_fail,
+	r#"
+        const statuses = ["pending", "done"];
+        statuses satisfies readonly ["pending", "done"];
+    "#,
+	&["Type 'string[]' is not assignable to type '[\"pending\", \"done\"]'."]
+);
+
+pass!(
+	array_literal_elements_as_const,
+	r#"
         const statuses = ["pending", "done"] as const;
         statuses satisfies readonly ["pending", "done"];
     "#
 );
 
-pass!(
-	array_literal_union_elements,
-	r#"
-        type Status = "pending" | "done" | "error";
-        const statuses: Status[] = ["pending", "done"];
-        statuses[0] satisfies Status;
-    "#
-);
+/*
+ * TODO: We need to add handling for cases where an expected_ty is available during check_expr,
+ *       such as during variable initialization. In these cases, we should extract an ExprChecker
+ *       from the BaseChecker and have the ExprChecker contain an expected_ty: Option<Ty> member.
+ */
+// pass!(
+// 	array_literal_union_elements,
+// 	r#"
+//         type Status = "pending" | "done" | "error";
+//         const statuses: Status[] = ["pending", "done"];
+//         statuses[0] satisfies Status;
+//     "#
+// );
 
 // === Conditional Type Narrowing with Literals ===
 

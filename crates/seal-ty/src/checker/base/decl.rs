@@ -1,5 +1,7 @@
-use swc_ecma_ast::{ClassDecl, Decl, FnDecl, Pat, VarDeclKind};
 use swc_common::Spanned;
+use swc_ecma_ast::{
+	ClassDecl, Decl, FnDecl, Pat, TsInterfaceDecl, TsPropertySignature, VarDeclKind,
+};
 
 use crate::{
 	TyKind,
@@ -72,15 +74,28 @@ impl BaseChecker<'_> {
 						if !self.satisfies(binding_ty, actual.ty) {
 							// Use special object type error for object literal assignments
 							match actual.ty.kind() {
-								TyKind::Object(_) => self.raise_object_type_error(binding_ty, actual.ty, init.span()),
+								TyKind::Object(_) => {
+									self.raise_object_type_error(binding_ty, actual.ty, init.span())
+								}
 								_ => self.raise_type_error(binding_ty, actual.ty, init.span()),
 							}
 						}
 
-						self.set_binding(&name, Some(actual), binding_ty, !is_const);
+						// For const declarations, use the narrower actual type if it satisfies the annotation
+						// For let declarations, use the annotation type to allow future assignment of compatible types
+						let final_type = if is_const {
+							actual.ty // Use the specific literal type for const
+						} else {
+							binding_ty // Use the annotation type for let (allows broader assignments)
+						};
+
+						self.set_binding(&name, Some(actual), final_type, !is_const);
 					} else {
 						if is_const {
-							self.add_error_with_span(ErrorKind::ConstMissingInit, var_declarator.span);
+							self.add_error_with_span(
+								ErrorKind::ConstMissingInit,
+								var_declarator.span,
+							);
 						}
 
 						self.set_binding(&name, None, binding_ty, !is_const);
@@ -101,7 +116,10 @@ impl BaseChecker<'_> {
 							let ty = match &ident.type_ann {
 								Some(type_ann) => self.build_ts_type(&type_ann.type_ann),
 								None => {
-									self.add_error_with_span(ErrorKind::ParamMissingTypeAnn, ident.span);
+									self.add_error_with_span(
+										ErrorKind::ParamMissingTypeAnn,
+										ident.span,
+									);
 									self.constants.err
 								}
 							};
@@ -159,9 +177,47 @@ impl BaseChecker<'_> {
 				// Type alias declarations: type Status = "loading" | "success" | "error"
 				let name = Symbol::new(type_alias.id.to_id());
 				let aliased_type = self.build_ts_type(&type_alias.type_ann);
-				
+
 				// Store the type alias as a binding so it can be referenced by name
 				self.set_binding(&name, None, aliased_type, false);
+			}
+			Decl::TsInterface(interface_decl) => {
+				let TsInterfaceDecl { id, body, .. } = interface_decl.as_ref();
+				// Interface declarations
+				let name = Symbol::new(id.to_id());
+				let mut fields = std::collections::BTreeMap::new();
+
+				// Process interface members
+				for member in &body.body {
+					match member {
+						swc_ecma_ast::TsTypeElement::TsPropertySignature(TsPropertySignature {
+							key,
+							type_ann,
+							..
+						}) => {
+							if let Some(ident) = key.as_ident() {
+								let prop_name = ident.sym.clone();
+								let prop_type = if let Some(type_ann) = type_ann {
+									self.build_ts_type(&type_ann.type_ann)
+								} else {
+									self.constants.unknown
+								};
+								fields.insert(prop_name, prop_type);
+							}
+						}
+						_ => {
+							// Other interface members like methods, index signatures etc
+							// For now, we'll skip them
+						}
+					}
+				}
+
+				// Create the interface type
+				let interface = std::rc::Rc::new(crate::kind::Interface::new(name.clone(), fields));
+				let interface_type = self.tcx.new_interface(interface);
+
+				// Store it as a binding
+				self.set_binding(&name, None, interface_type, false);
 			}
 			_ => todo!("{:#?}", decl),
 		}

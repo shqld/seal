@@ -107,10 +107,10 @@ impl<'tcx> FunctionChecker<'tcx> {
 				if let Some(arg) = arg {
 					let actual = self.check_expr(arg);
 					
-					// Apply contextual typing for return expressions
-					let contextual_actual_ty = self.widen(actual.ty);
-					if !self.satisfies(expected, contextual_actual_ty) {
-						self.raise_type_error(expected, contextual_actual_ty, arg.span());
+					// Check if the actual return value satisfies the expected return type
+					// Don't widen literal types - let them be checked as-is for better type safety
+					if !self.satisfies(expected, actual.ty) {
+						self.raise_type_error(expected, actual.ty, arg.span());
 					}
 				} else if !matches!(expected.kind(), TyKind::Void) {
 					self.add_error_with_span(ErrorKind::UnexpectedVoid, *span);

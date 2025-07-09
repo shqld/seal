@@ -55,11 +55,41 @@ impl<'tcx> BaseChecker<'tcx> {
 					.any(|expected| self.satisfies(*expected, *actual))
 			}),
 			(Union(expected), _) => expected.arms().iter().any(|ty| self.satisfies(*ty, actual)),
+			(_, Union(actual)) => actual.arms().iter().all(|ty| self.satisfies(expected, *ty)),
 
 			(Array(expected), Array(actual)) => self.satisfies(expected.element, actual.element),
+			
+			// Tuple type compatibility
+			(Tuple(expected), Tuple(actual)) => {
+				// Tuples must have same length and each element must satisfy
+				if expected.elements.len() != actual.elements.len() {
+					return false;
+				}
+				
+				for (expected_elem, actual_elem) in expected.elements.iter().zip(actual.elements.iter()) {
+					if !self.satisfies(*expected_elem, *actual_elem) {
+						return false;
+					}
+				}
+				
+				true
+			}
 
-			// Object literal should satisfy Object type
-			(Interface(expected), Object(_)) if expected.name().name() == "Object" => true,
+			// Object literal should satisfy interface through structural typing
+			(Interface(expected), Object(actual_obj)) => {
+				// Check if object literal has all properties of interface
+				for (prop, expected_ty) in expected.fields() {
+					match actual_obj.get_prop(prop) {
+						Some(actual_ty) => {
+							if !self.satisfies(*expected_ty, actual_ty) {
+								return false;
+							}
+						}
+						None => return false,
+					}
+				}
+				true
+			}
 
 			// Interface inheritance checking
 			(Interface(expected_interface), Interface(actual_interface)) => {

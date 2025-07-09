@@ -31,7 +31,7 @@ fail!(
 	r#"
         let value: number | string = true;
     "#,
-	&["Type 'boolean' is not assignable to type 'number | string'."]
+	&["Type 'true' is not assignable to type 'number | string'."]
 );
 
 pass!(

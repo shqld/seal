@@ -11,7 +11,7 @@ use swc_common::SyntaxContext;
 use crate::{
 	Ty, TyKind,
 	intern::interner::Interner,
-	kind::{Array, Class, Function, Interface, Object, Union},
+	kind::{Array, Class, Function, Interface, Object, Tuple, Union},
 	sir::{Def, DefId},
 	symbol::Symbol,
 };
@@ -113,6 +113,10 @@ impl<'tcx> TyContext<'tcx> {
 
 	pub fn new_array(&'tcx self, element: Ty<'tcx>) -> Ty<'tcx> {
 		self.new_ty(TyKind::Array(Array::new(element)))
+	}
+
+	pub fn new_tuple(&'tcx self, elements: Vec<Ty<'tcx>>) -> Ty<'tcx> {
+		self.new_ty(TyKind::Tuple(Tuple::new(elements)))
 	}
 }
 
