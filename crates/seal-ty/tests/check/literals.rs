@@ -327,19 +327,14 @@ pass!(
     "#
 );
 
-/*
- * TODO: We need to add handling for cases where an expected_ty is available during check_expr,
- *       such as during variable initialization. In these cases, we should extract an ExprChecker
- *       from the BaseChecker and have the ExprChecker contain an expected_ty: Option<Ty> member.
- */
-// pass!(
-// 	array_literal_union_elements,
-// 	r#"
-//         type Status = "pending" | "done" | "error";
-//         const statuses: Status[] = ["pending", "done"];
-//         statuses[0] satisfies Status;
-//     "#
-// );
+pass!(
+	array_literal_union_elements,
+	r#"
+        type Status = "pending" | "done" | "error";
+        const statuses: Status[] = ["pending", "done"];
+        statuses[0] satisfies Status;
+    "#
+);
 
 // === Conditional Type Narrowing with Literals ===
 

@@ -1,5 +1,4 @@
 mod decl;
-mod expr;
 mod narrow;
 mod satisfies;
 mod stmt;
@@ -19,16 +18,16 @@ use swc_common::Span;
 use super::errors::{Error, ErrorKind};
 
 #[derive(Debug, Clone, Copy)]
-struct Binding<'tcx> {
-	ty: Ty<'tcx>,
-	current: Option<Local<'tcx>>,
-	is_assignable: bool,
+pub struct Binding<'tcx> {
+	pub ty: Ty<'tcx>,
+	pub current: Option<Local<'tcx>>,
+	pub is_assignable: bool,
 }
 
 pub struct BaseChecker<'tcx> {
 	pub tcx: &'tcx TyContext<'tcx>,
 	pub constants: TyConstants<'tcx>,
-	bindings: RefCell<HashMap<Symbol, Binding<'tcx>>>,
+	pub bindings: RefCell<HashMap<Symbol, Binding<'tcx>>>,
 	pub locals: RefCell<HashMap<LocalId, Value>>,
 	pub errors: RefCell<Vec<Error<'tcx>>>,
 }
@@ -101,7 +100,7 @@ impl<'tcx> BaseChecker<'tcx> {
 		self.errors.borrow_mut().push(Error::new(err, span));
 	}
 
-	fn get_binding(&self, name: &Symbol) -> Option<Binding<'tcx>> {
+	pub fn get_binding(&self, name: &Symbol) -> Option<Binding<'tcx>> {
 		self.bindings.borrow().get(name).copied()
 	}
 
@@ -145,17 +144,22 @@ impl<'tcx> BaseChecker<'tcx> {
 
 		match ty.kind() {
 			TyKind::Object(obj) => {
-				let widened_fields = obj.fields.iter().map(|(key, ty)| {
-					let widened_ty = match ty.kind() {
-						TyKind::Number(_) => self.constants.number,  // 30 -> number
-						TyKind::Boolean(_) => self.constants.boolean, // true -> boolean
-						TyKind::String(_) => *ty,  // Keep string literals like "Alice"
-						_ => *ty,
-					};
-					(key.clone(), widened_ty)
-				}).collect::<BTreeMap<_, _>>();
-				
-				self.tcx.new_object(crate::kind::Object::new(widened_fields))
+				let widened_fields = obj
+					.fields
+					.iter()
+					.map(|(key, ty)| {
+						let widened_ty = match ty.kind() {
+							TyKind::Number(_) => self.constants.number, // 30 -> number
+							TyKind::Boolean(_) => self.constants.boolean, // true -> boolean
+							TyKind::String(_) => *ty,                   // Keep string literals like "Alice"
+							_ => *ty,
+						};
+						(key.clone(), widened_ty)
+					})
+					.collect::<BTreeMap<_, _>>();
+
+				self.tcx
+					.new_object(crate::kind::Object::new(widened_fields))
 			}
 			_ => ty,
 		}
