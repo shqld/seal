@@ -9,7 +9,6 @@ use crate::context::TyContext;
 mod base;
 mod class;
 pub mod errors;
-pub mod expr;
 mod function;
 
 #[derive(Debug)]

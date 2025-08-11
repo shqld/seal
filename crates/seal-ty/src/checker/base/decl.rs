@@ -5,7 +5,7 @@ use swc_ecma_ast::{
 
 use crate::{
 	TyKind,
-	checker::{class::ClassChecker, errors::ErrorKind, function::FunctionChecker, expr::ExprChecker},
+	checker::{class::ClassChecker, errors::ErrorKind, function::FunctionChecker},
 	sir::{Def, Value},
 	symbol::Symbol,
 };
@@ -54,13 +54,7 @@ impl BaseChecker<'_> {
 						.unwrap_or_else(|| self.constants.lazy);
 
 					if let Some(init) = &var_declarator.init {
-						let actual = if let TyKind::Lazy = binding_ty.kind() {
-							// No type annotation, check without expected type
-							ExprChecker::new(self).check_expr(init)
-						} else {
-							// Has type annotation, pass it as expected type
-							ExprChecker::new_with_expected(self, binding_ty).check_expr(init)
-						};
+						let actual = self.check_expr(init);
 
 						// TODO: binding is Option<Local>, so we can remove TyKind::Lazy and check if it's None
 						if let TyKind::Lazy = binding_ty.kind() {
