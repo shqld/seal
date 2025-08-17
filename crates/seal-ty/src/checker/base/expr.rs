@@ -28,7 +28,10 @@ impl<'tcx> BaseChecker<'tcx> {
 								binding
 							} else {
 								// If binding doesn't exist, add an error and return
-								self.add_error_with_span(ErrorKind::CannotFindName(name), ident.span);
+								self.add_error_with_span(
+									ErrorKind::CannotFindName(name),
+									ident.span,
+								);
 								return self.add_local(self.constants.err, Value::Err);
 							};
 
@@ -68,23 +71,30 @@ impl<'tcx> BaseChecker<'tcx> {
 							// Handle member assignment: obj.prop = value
 							let obj = self.check_expr(&member.obj, None);
 							let value = self.check_expr(right, expected_ty);
-							
+
 							match &member.prop {
 								MemberProp::Ident(ident) => {
 									let key = ident.sym.clone();
-									
+
 									// Check if the property exists and get its expected type
 									match obj.ty.kind() {
 										TyKind::Object(obj_ty) => {
 											if let Some(prop_ty) = obj_ty.get_prop(&key) {
 												// Property exists, check type compatibility
 												if !self.satisfies(prop_ty, value.ty) {
-													self.raise_type_error(prop_ty, value.ty, right.span());
+													self.raise_type_error(
+														prop_ty,
+														value.ty,
+														right.span(),
+													);
 												}
 											} else {
 												// Property doesn't exist
 												self.add_error_with_span(
-													ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()),
+													ErrorKind::PropertyDoesNotExist(
+														obj.ty,
+														key.clone(),
+													),
 													ident.span,
 												);
 											}
@@ -92,24 +102,31 @@ impl<'tcx> BaseChecker<'tcx> {
 										_ => {
 											// Trying to assign to a property of a non-object type
 											self.add_error_with_span(
-												ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()),
+												ErrorKind::PropertyDoesNotExist(
+													obj.ty,
+													key.clone(),
+												),
 												ident.span,
 											);
 										}
 									}
-									
+
 									// Return the assigned value
 									value
 								}
 								MemberProp::Computed(computed) => {
 									// Handle computed property assignment: obj[key] = value
 									let _index = self.check_expr(&computed.expr, None);
-									
+
 									match obj.ty.kind() {
 										TyKind::Array(array) => {
 											// Array element assignment
 											if !self.satisfies(array.element, value.ty) {
-												self.raise_type_error(array.element, value.ty, right.span());
+												self.raise_type_error(
+													array.element,
+													value.ty,
+													right.span(),
+												);
 											}
 										}
 										TyKind::Object(_) => {
@@ -121,7 +138,7 @@ impl<'tcx> BaseChecker<'tcx> {
 											// But we'll be lenient and just return the value
 										}
 									}
-									
+
 									value
 								}
 								_ => todo!("Private member assignment not implemented"),
@@ -681,10 +698,11 @@ impl<'tcx> BaseChecker<'tcx> {
 					.collect();
 
 				if elements.is_empty() {
-					// Empty array - we'll need a way to handle generic arrays
-					// For now, return an array of 'never' type
 					self.add_local(
-						self.tcx.new_array(self.constants.never),
+						self.tcx.new_array(match expected_element_ty {
+							Some(ty) => ty,
+							None => self.constants.unknown,
+						}),
 						Value::Array(vec![]),
 					)
 				} else {

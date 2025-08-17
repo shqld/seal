@@ -4,7 +4,7 @@ pass!(
 	array_literal_empty,
 	r#"
         let arr = [];
-        arr satisfies never[];
+        arr satisfies unknown[]; // NOTE: unknown instead of any or never
     "#
 );
 
@@ -87,4 +87,39 @@ pass!(
         let cube: number[][][] = [[[1, 2]], [[3, 4]]];
         cube satisfies number[][][];
     "#
+);
+
+pass!(
+	member_assignment,
+	r#"
+        let arr: number[] = [1, 2, 3];
+        arr[0] = 10;
+        arr[4] = 4;
+        arr[100] = 100;
+        arr[-1] = 1;
+    "#
+);
+
+fail!(
+	element_assignment_type_mismatch,
+	r#"
+        let arr: number[] = [1, 2, 3];
+        arr[0] = "wrong";
+    "#,
+	&["Type 'string' is not assignable to type 'number'."]
+);
+
+fail!(
+	array_with_no_annotation,
+	r#"
+        let arr = [];
+        arr satisfies unknown[];
+        arr satisfies number[]; // ERROR
+        arr[0] satisfies unknown;
+        arr[0] satisfies number; // ERROR
+    "#,
+	&[
+		"Type 'unknown[]' is not assignable to type 'number[]'.",
+		"Type 'unknown' is not assignable to type 'number'.",
+	]
 );

@@ -12,8 +12,7 @@ impl<'tcx> BaseChecker<'tcx> {
 			(Err, _) | (_, Err) => true,
 			// never type is the bottom type - nothing can be assigned to it except never itself
 			(Never, Never) => true,
-			(Never, _) => false,
-			(_, Never) => true, // never can be assigned to anything
+			(Never, _) | (_, Never) => false,
 			// unknown type is the top type - anything can be assigned to it
 			(Unknown, _) => true,
 			// null type is distinct
@@ -58,20 +57,22 @@ impl<'tcx> BaseChecker<'tcx> {
 			(_, Union(actual)) => actual.arms().iter().all(|ty| self.satisfies(expected, *ty)),
 
 			(Array(expected), Array(actual)) => self.satisfies(expected.element, actual.element),
-			
+
 			// Tuple type compatibility
 			(Tuple(expected), Tuple(actual)) => {
 				// Tuples must have same length and each element must satisfy
 				if expected.elements.len() != actual.elements.len() {
 					return false;
 				}
-				
-				for (expected_elem, actual_elem) in expected.elements.iter().zip(actual.elements.iter()) {
+
+				for (expected_elem, actual_elem) in
+					expected.elements.iter().zip(actual.elements.iter())
+				{
 					if !self.satisfies(*expected_elem, *actual_elem) {
 						return false;
 					}
 				}
-				
+
 				true
 			}
 

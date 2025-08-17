@@ -169,17 +169,6 @@ pass!(
     "#
 );
 
-pass!(
-	member_assignment_array,
-	r#"
-        let arr: number[] = [1, 2, 3];
-        arr[0] = 10;
-        arr[4] = 4;
-        arr[100] = 100;
-        arr[-1] = 1;
-    "#
-);
-
 fail!(
 	member_assignment_type_mismatch,
 	r#"
@@ -203,15 +192,6 @@ fail!(
 	r#"
         let obj: { a: number } = { a: 10 };
         obj.a = "wrong";
-    "#,
-	&["Type 'string' is not assignable to type 'number'."]
-);
-
-fail!(
-	array_element_assignment_type_mismatch_array,
-	r#"
-        let arr: number[] = [1, 2, 3];
-        arr[0] = "wrong";
     "#,
 	&["Type 'string' is not assignable to type 'number'."]
 );
