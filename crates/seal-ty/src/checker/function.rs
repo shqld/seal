@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::{cell::Cell, ops::Deref};
 
-use swc_ecma_ast::{BlockStmt, Function, ReturnStmt, Stmt};
 use swc_common::Spanned;
+use swc_ecma_ast::{BlockStmt, Function, ReturnStmt, Stmt};
 
 use super::{base::BaseChecker, errors::Error};
 
@@ -105,8 +105,8 @@ impl<'tcx> FunctionChecker<'tcx> {
 				let expected = self.ret;
 
 				if let Some(arg) = arg {
-					let actual = self.check_expr(arg);
-					
+					let actual = self.check_expr(arg, None);
+
 					// Check if the actual return value satisfies the expected return type
 					// Don't widen literal types - let them be checked as-is for better type safety
 					if !self.satisfies(expected, actual.ty) {

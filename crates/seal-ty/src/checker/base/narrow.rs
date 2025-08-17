@@ -7,7 +7,12 @@ use crate::{Ty, TyKind, symbol::Symbol};
 use super::BaseChecker;
 
 impl<'tcx> BaseChecker<'tcx> {
-	pub fn narrow(&self, left: &Expr, right: &Expr) -> Option<Ty<'tcx>> {
+	pub fn narrow(
+		&self,
+		left: &Expr,
+		right: &Expr,
+		expected_ty: Option<Ty<'tcx>>,
+	) -> Option<Ty<'tcx>> {
 		match (left, right) {
 			(
 				Expr::Unary(UnaryExpr {
@@ -27,7 +32,7 @@ impl<'tcx> BaseChecker<'tcx> {
 			) => {
 				if let Expr::Ident(ident) = arg.as_ref() {
 					let name = Symbol::new(ident.to_id());
-					let value = self.check_expr(value);
+					let value = self.check_expr(value, expected_ty);
 
 					// TODO: seal should allow only const string for rhs of Eq(TypeOf) in Sir?
 					if let TyKind::String(Some(value)) = value.ty.kind() {
@@ -48,11 +53,11 @@ impl<'tcx> BaseChecker<'tcx> {
 			| (value, Expr::Member(MemberExpr { obj, prop, .. })) => {
 				if let Expr::Ident(ident) = obj.as_ref() {
 					let name = Symbol::new(ident.to_id());
-					let obj = self.check_expr(obj);
+					let obj = self.check_expr(obj, expected_ty);
 					let key = &prop.as_ident().unwrap().sym;
 
 					if let TyKind::Union(uni) = obj.ty.kind() {
-						let value = self.check_expr(value);
+						let value = self.check_expr(value, expected_ty);
 
 						let narrowed_arms: BTreeSet<_> = uni
 							.arms()

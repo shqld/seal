@@ -8,7 +8,7 @@ use swc_ecma_ast::{
 };
 
 use crate::{
-	TyKind,
+	Ty, TyKind,
 	checker::{errors::ErrorKind, function::FunctionChecker},
 	sir::{Local, Value},
 	symbol::Symbol,
@@ -17,7 +17,7 @@ use crate::{
 use super::BaseChecker;
 
 impl<'tcx> BaseChecker<'tcx> {
-	pub fn check_expr(&self, expr: &Expr) -> Local<'tcx> {
+	pub fn check_expr(&self, expr: &Expr, expected_ty: Option<Ty<'tcx>>) -> Local<'tcx> {
 		match expr {
 			Expr::Assign(AssignExpr { left, right, .. }) => {
 				let (binding_ident, binding_span) = match &left {
@@ -43,7 +43,7 @@ impl<'tcx> BaseChecker<'tcx> {
 					);
 				}
 
-				let value = self.check_expr(right);
+				let value = self.check_expr(right, expected_ty);
 
 				// TODO: binding is Option<Local>, so we can remove TyKind::Lazy and check if it's None
 				if let TyKind::Lazy = binding.ty.kind() {
@@ -69,7 +69,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				value
 			}
 			Expr::TsSatisfies(TsSatisfiesExpr { expr, type_ann, .. }) => {
-				let value = self.check_expr(expr);
+				let value = self.check_expr(expr, expected_ty);
 
 				let expected = self.build_ts_type(type_ann);
 				let actual = value.ty;
@@ -131,7 +131,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				}
 			}
 			Expr::Unary(unary) => {
-				let value = self.check_expr(&unary.arg);
+				let value = self.check_expr(&unary.arg, expected_ty);
 
 				match unary.op {
 					UnaryOp::TypeOf => {
@@ -186,8 +186,8 @@ impl<'tcx> BaseChecker<'tcx> {
 			}) => {
 				let left_ast = left;
 				let right_ast = right;
-				let left = self.check_expr(left);
-				let right = self.check_expr(right);
+				let left = self.check_expr(left, expected_ty);
+				let right = self.check_expr(right, expected_ty);
 
 				match op {
 					BinaryOp::EqEqEq => {
@@ -202,7 +202,7 @@ impl<'tcx> BaseChecker<'tcx> {
 
 						let value = Value::Eq(left.id, right.id);
 
-						if let Some(narrowed_ty) = self.narrow(left_ast, right_ast) {
+						if let Some(narrowed_ty) = self.narrow(left_ast, right_ast, expected_ty) {
 							self.add_local(narrowed_ty, value)
 						} else {
 							self.add_local(self.constants.boolean, Value::Eq(left.id, right.id))
@@ -395,7 +395,7 @@ impl<'tcx> BaseChecker<'tcx> {
 			Expr::Member(MemberExpr {
 				obj, prop, span, ..
 			}) => {
-				let obj = self.check_expr(obj);
+				let obj = self.check_expr(obj, expected_ty);
 
 				match &prop {
 					MemberProp::Ident(ident) => {
@@ -404,7 +404,7 @@ impl<'tcx> BaseChecker<'tcx> {
 					}
 					MemberProp::Computed(computed) => {
 						// Handle computed property access like arr[0] or obj["key"]
-						let index = self.check_expr(&computed.expr);
+						let index = self.check_expr(&computed.expr, expected_ty);
 						self.handle_computed_access(obj, index, *span)
 					}
 					_ => todo!("{:#?}", prop),
@@ -419,7 +419,7 @@ impl<'tcx> BaseChecker<'tcx> {
 						PropOrSpread::Prop(prop) => match prop.as_ref() {
 							Prop::KeyValue(kv) => {
 								let key = kv.key.as_ident().unwrap().sym.clone();
-								let value = self.check_expr(&kv.value);
+								let value = self.check_expr(&kv.value, expected_ty);
 
 								obj_ty.fields.insert(key.clone(), value.ty);
 								obj.fields.push((key, value.id));
@@ -460,7 +460,7 @@ impl<'tcx> BaseChecker<'tcx> {
 				match closure.body.as_ref() {
 					BlockStmtOrExpr::Expr(body) => {
 						// TODO: use FunctionChecker or BaseChecker
-						let ret = self.check_expr(body);
+						let ret = self.check_expr(body, expected_ty);
 
 						if let Some(return_type) = &closure.return_type {
 							let expected = self.build_ts_type(&return_type.type_ann);
@@ -504,7 +504,7 @@ impl<'tcx> BaseChecker<'tcx> {
 			Expr::New(NewExpr {
 				callee, args, span, ..
 			}) => {
-				let callee = self.check_expr(callee);
+				let callee = self.check_expr(callee, expected_ty);
 
 				let class = match callee.ty.kind() {
 					TyKind::Class(class) => class,
@@ -527,7 +527,7 @@ impl<'tcx> BaseChecker<'tcx> {
 						todo!()
 					}
 
-					self.check_expr(expr)
+					self.check_expr(expr, expected_ty)
 				});
 
 				let instance = self.add_local(
@@ -561,10 +561,13 @@ impl<'tcx> BaseChecker<'tcx> {
 			Expr::Call(CallExpr {
 				callee, args, span, ..
 			}) => {
-				let callee = self.check_expr(match callee {
-					Callee::Expr(expr) => expr,
-					_ => todo!("{:#?}", callee),
-				});
+				let callee = self.check_expr(
+					match callee {
+						Callee::Expr(expr) => expr,
+						_ => todo!("{:#?}", callee),
+					},
+					expected_ty,
+				);
 
 				let function = match callee.ty.kind() {
 					TyKind::Function(function) => function,
@@ -579,7 +582,7 @@ impl<'tcx> BaseChecker<'tcx> {
 						todo!()
 					}
 
-					self.check_expr(expr)
+					self.check_expr(expr, expected_ty)
 				});
 
 				for ((_, param), arg) in function.params.iter().zip(args.clone()) {
@@ -594,6 +597,12 @@ impl<'tcx> BaseChecker<'tcx> {
 				)
 			}
 			Expr::Array(array) => {
+				// Check if we have an expected array type to get the expected element type
+				let expected_element_ty = expected_ty.and_then(|ty| match ty.kind() {
+					TyKind::Array(array_ty) => Some(array_ty.element),
+					_ => None,
+				});
+
 				let elements: Vec<_> = array
 					.elems
 					.iter()
@@ -602,7 +611,8 @@ impl<'tcx> BaseChecker<'tcx> {
 						if spread.is_some() {
 							todo!("spread in array literal")
 						}
-						self.check_expr(expr)
+						// Pass the expected element type when checking each element
+						self.check_expr(expr, expected_ty)
 					})
 					.collect();
 
@@ -614,28 +624,55 @@ impl<'tcx> BaseChecker<'tcx> {
 						Value::Array(vec![]),
 					)
 				} else {
-					// Create a union type of all element types, normalizing literal types
-					let element_types: BTreeSet<_> = elements
-						.iter()
-						.map(|e| {
-							// Normalize literal types to their base types for array inference
-							match e.ty.kind() {
-								TyKind::String(_) => self.constants.string,
-								TyKind::Number(_) => self.constants.number,
-								TyKind::Boolean(_) => self.constants.boolean,
-								_ => e.ty,
-							}
-						})
-						.collect();
+					// Infer the element type from actual elements
+					let (element_types, _preserve_literals): (BTreeSet<_>, bool) =
+						if let Some(expected_elem) = expected_element_ty {
+							// If we have an expected element type that is a union containing literals,
+							// preserve the literal types
+							let preserve = matches!(expected_elem.kind(), TyKind::Union(_));
+							let types = elements
+								.iter()
+								.map(|e| {
+									if preserve {
+										e.ty
+									} else {
+										// Normalize literal types to their base types
+										match e.ty.kind() {
+											TyKind::String(_) => self.constants.string,
+											TyKind::Number(_) => self.constants.number,
+											TyKind::Boolean(_) => self.constants.boolean,
+											_ => e.ty,
+										}
+									}
+								})
+								.collect();
+							(types, preserve)
+						} else {
+							// No expected type - normalize literals for array inference
+							let types = elements
+								.iter()
+								.map(|e| {
+									// Normalize literal types to their base types for array inference
+									match e.ty.kind() {
+										TyKind::String(_) => self.constants.string,
+										TyKind::Number(_) => self.constants.number,
+										TyKind::Boolean(_) => self.constants.boolean,
+										_ => e.ty,
+									}
+								})
+								.collect();
+							(types, false)
+						};
 
-					let element_type = if element_types.len() == 1 {
+					let inferred_element_type = if element_types.len() == 1 {
 						*element_types.iter().next().unwrap()
 					} else {
 						self.tcx.new_union(element_types)
 					};
 
+					// Always use the inferred type - the satisfies check happens in decl.rs
 					self.add_local(
-						self.tcx.new_array(element_type),
+						self.tcx.new_array(inferred_element_type),
 						Value::Array(elements.into_iter().map(|e| e.id).collect()),
 					)
 				}
@@ -643,7 +680,11 @@ impl<'tcx> BaseChecker<'tcx> {
 			Expr::Tpl(tpl) => {
 				// Template literals always result in string type
 				// We could track the literal value for const strings, but for now just return string
-				let parts: Vec<_> = tpl.exprs.iter().map(|expr| self.check_expr(expr)).collect();
+				let parts: Vec<_> = tpl
+					.exprs
+					.iter()
+					.map(|expr| self.check_expr(expr, expected_ty))
+					.collect();
 
 				// All interpolated expressions should be convertible to string
 				// In TypeScript, this is implicit
@@ -656,13 +697,13 @@ impl<'tcx> BaseChecker<'tcx> {
 				// Sequence expression (comma operator): evaluate all expressions, return the last one
 				let mut result = None;
 				for expr in exprs {
-					result = Some(self.check_expr(expr));
+					result = Some(self.check_expr(expr, expected_ty));
 				}
 				result.unwrap_or_else(|| self.add_local(self.constants.void, Value::Err))
 			}
 			Expr::Paren(paren) => {
 				// Parenthesized expression - just evaluate the inner expression
-				self.check_expr(&paren.expr)
+				self.check_expr(&paren.expr, expected_ty)
 			}
 			Expr::TsConstAssertion(TsConstAssertion { expr, .. }) => {
 				// TypeScript const assertion - prevents widening of literal types
@@ -677,7 +718,7 @@ impl<'tcx> BaseChecker<'tcx> {
 								if spread.is_some() {
 									todo!("spread in array literal")
 								}
-								self.check_expr(expr)
+								self.check_expr(expr, expected_ty)
 							})
 							.collect();
 
@@ -700,7 +741,7 @@ impl<'tcx> BaseChecker<'tcx> {
 					}
 					// For other expressions with const assertion, just check normally
 					// In a more complete implementation, we'd handle objects differently too
-					_ => self.check_expr(expr),
+					_ => self.check_expr(expr, expected_ty),
 				}
 			}
 			_ => todo!("{:#?}", expr),

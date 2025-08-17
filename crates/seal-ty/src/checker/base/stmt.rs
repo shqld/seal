@@ -14,7 +14,7 @@ impl BaseChecker<'_> {
 		match stmt {
 			Stmt::Decl(decl) => self.check_decl(decl),
 			Stmt::Expr(ExprStmt { expr, .. }) => {
-				self.check_expr(expr);
+				self.check_expr(expr, None);
 			}
 			Stmt::Return(_) => {
 				unreachable!("Return statement must be handled in function context");
@@ -46,7 +46,7 @@ impl BaseChecker<'_> {
 
 				for (i, (test, cons)) in branches.iter().enumerate() {
 					let checker = &scopes[i];
-					let test = self.check_expr(test);
+					let test = self.check_expr(test, None);
 
 					if let TyKind::Guard(name, narrowed_ty) = test.ty.kind() {
 						let current = self.get_binding(name).unwrap();
@@ -84,7 +84,7 @@ impl BaseChecker<'_> {
 			}
 			Stmt::While(WhileStmt { test, body, .. }) => {
 				// Check test expression
-				self.check_expr(test);
+				self.check_expr(test, None);
 
 				// Check body in new scope
 				let checker = self.new_scoped_checker();
@@ -96,7 +96,7 @@ impl BaseChecker<'_> {
 				checker.check_stmt(body);
 
 				// Then check test expression
-				self.check_expr(test);
+				self.check_expr(test, None);
 			}
 			Stmt::For(ForStmt {
 				init,
@@ -115,19 +115,19 @@ impl BaseChecker<'_> {
 							checker.check_decl(&swc_ecma_ast::Decl::Var(decl.clone()))
 						}
 						swc_ecma_ast::VarDeclOrExpr::Expr(expr) => {
-							checker.check_expr(expr);
+							checker.check_expr(expr, None);
 						}
 					}
 				}
 
 				// Check test expression
 				if let Some(test) = test {
-					checker.check_expr(test);
+					checker.check_expr(test, None);
 				}
 
 				// Check update expression
 				if let Some(update) = update {
-					checker.check_expr(update);
+					checker.check_expr(update, None);
 				}
 
 				// Check body
@@ -145,7 +145,7 @@ impl BaseChecker<'_> {
 				..
 			}) => {
 				// Check discriminant expression
-				let _discriminant_value = self.check_expr(discriminant);
+				let _discriminant_value = self.check_expr(discriminant, None);
 
 				// Check each case
 				for case in cases {
@@ -153,7 +153,7 @@ impl BaseChecker<'_> {
 
 					// Check case test expression if it exists
 					if let Some(test) = &case.test {
-						checker.check_expr(test);
+						checker.check_expr(test, None);
 					}
 
 					// Check case body
@@ -164,7 +164,7 @@ impl BaseChecker<'_> {
 			}
 			Stmt::Throw(ThrowStmt { arg, .. }) => {
 				// Check the thrown expression
-				self.check_expr(arg);
+				self.check_expr(arg, None);
 			}
 			Stmt::Try(try_stmt) => {
 				let TryStmt {

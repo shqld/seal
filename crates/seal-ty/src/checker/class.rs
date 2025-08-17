@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::{collections::BTreeMap, ops::Deref};
 
-use swc_ecma_ast::{Class, ClassMember, Constructor, ParamOrTsParamProp, Pat, PropName, Stmt};
 use swc_common::Spanned;
+use swc_ecma_ast::{Class, ClassMember, Constructor, ParamOrTsParamProp, Pat, PropName, Stmt};
 
 use super::base::BaseChecker;
 use super::errors::{Error, ErrorKind};
@@ -47,12 +47,15 @@ impl<'tcx> ClassChecker<'tcx> {
 		// Check for parent class
 		let parent: Option<crate::Ty<'tcx>> = if let Some(super_class) = &class.super_class {
 			// Evaluate the super class expression
-			let parent_local = self.check_expr(super_class);
+			let parent_local = self.check_expr(super_class, None);
 			// The parent should be a class type
 			match parent_local.ty.kind() {
 				crate::TyKind::Class(_) => Some(parent_local.ty),
 				_ => {
-					self.add_error_with_span(ErrorKind::ExtendsNonClass(parent_local.ty), super_class.span());
+					self.add_error_with_span(
+						ErrorKind::ExtendsNonClass(parent_local.ty),
+						super_class.span(),
+					);
 					None
 				}
 			}
@@ -89,7 +92,10 @@ impl<'tcx> ClassChecker<'tcx> {
 						.type_ann
 						.as_ref()
 						.map(|type_ann| self.build_ts_type(&type_ann.type_ann));
-					let init = prop.value.as_ref().map(|value| self.check_expr(value));
+					let init = prop
+						.value
+						.as_ref()
+						.map(|value| self.check_expr(value, None));
 
 					let ty = match (ty, init) {
 						(Some(ty), Some(init)) => {
@@ -101,7 +107,10 @@ impl<'tcx> ClassChecker<'tcx> {
 						(Some(ty), None) => ty,
 						(None, Some(init)) => init.ty,
 						(None, None) => {
-							self.add_error_with_span(ErrorKind::ClassPropMissingTypeAnnOrInit, prop.span);
+							self.add_error_with_span(
+								ErrorKind::ClassPropMissingTypeAnnOrInit,
+								prop.span,
+							);
 							self.constants.err
 						}
 					};
@@ -123,7 +132,10 @@ impl<'tcx> ClassChecker<'tcx> {
 								let ty = match &ident.type_ann {
 									Some(type_ann) => self.build_ts_type(&type_ann.type_ann),
 									None => {
-										self.add_error_with_span(ErrorKind::ParamMissingTypeAnn, ident.span);
+										self.add_error_with_span(
+											ErrorKind::ParamMissingTypeAnn,
+											ident.span,
+										);
 										self.constants.err
 									}
 								};
@@ -193,7 +205,10 @@ impl<'tcx> ClassChecker<'tcx> {
 						let ty = match &ident.type_ann {
 							Some(type_ann) => self.build_ts_type(&type_ann.type_ann),
 							None => {
-								self.add_error_with_span(ErrorKind::ParamMissingTypeAnn, ident.span);
+								self.add_error_with_span(
+									ErrorKind::ParamMissingTypeAnn,
+									ident.span,
+								);
 								self.constants.err
 							}
 						};

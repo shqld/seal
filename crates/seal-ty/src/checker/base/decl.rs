@@ -54,7 +54,13 @@ impl BaseChecker<'_> {
 						.unwrap_or_else(|| self.constants.lazy);
 
 					if let Some(init) = &var_declarator.init {
-						let actual = self.check_expr(init);
+						let actual = if let TyKind::Lazy = binding_ty.kind() {
+							// No type annotation, check without expected type
+							self.check_expr(init, None)
+						} else {
+							// Has type annotation, pass it as expected type
+							self.check_expr(init, Some(binding_ty))
+						};
 
 						// TODO: binding is Option<Local>, so we can remove TyKind::Lazy and check if it's None
 						if let TyKind::Lazy = binding_ty.kind() {

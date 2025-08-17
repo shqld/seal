@@ -145,17 +145,22 @@ impl<'tcx> BaseChecker<'tcx> {
 
 		match ty.kind() {
 			TyKind::Object(obj) => {
-				let widened_fields = obj.fields.iter().map(|(key, ty)| {
-					let widened_ty = match ty.kind() {
-						TyKind::Number(_) => self.constants.number,  // 30 -> number
-						TyKind::Boolean(_) => self.constants.boolean, // true -> boolean
-						TyKind::String(_) => *ty,  // Keep string literals like "Alice"
-						_ => *ty,
-					};
-					(key.clone(), widened_ty)
-				}).collect::<BTreeMap<_, _>>();
-				
-				self.tcx.new_object(crate::kind::Object::new(widened_fields))
+				let widened_fields = obj
+					.fields
+					.iter()
+					.map(|(key, ty)| {
+						let widened_ty = match ty.kind() {
+							TyKind::Number(_) => self.constants.number, // 30 -> number
+							TyKind::Boolean(_) => self.constants.boolean, // true -> boolean
+							TyKind::String(_) => *ty,                   // Keep string literals like "Alice"
+							_ => *ty,
+						};
+						(key.clone(), widened_ty)
+					})
+					.collect::<BTreeMap<_, _>>();
+
+				self.tcx
+					.new_object(crate::kind::Object::new(widened_fields))
 			}
 			_ => ty,
 		}
