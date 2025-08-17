@@ -20,53 +20,117 @@ impl<'tcx> BaseChecker<'tcx> {
 	pub fn check_expr(&self, expr: &Expr, expected_ty: Option<Ty<'tcx>>) -> Local<'tcx> {
 		match expr {
 			Expr::Assign(AssignExpr { left, right, .. }) => {
-				let (binding_ident, binding_span) = match &left {
+				match &left {
 					AssignTarget::Simple(target) => match &target {
-						SimpleAssignTarget::Ident(ident) => (ident, ident.span),
+						SimpleAssignTarget::Ident(ident) => {
+							let name = Symbol::new(ident.to_id());
+							let binding = if let Some(binding) = self.get_binding(&name) {
+								binding
+							} else {
+								// If binding doesn't exist, add an error and return
+								self.add_error_with_span(ErrorKind::CannotFindName(name), ident.span);
+								return self.add_local(self.constants.err, Value::Err);
+							};
+
+							if !binding.is_assignable {
+								self.add_error_with_span(
+									ErrorKind::CannotAssignToConst(name.clone()),
+									ident.span,
+								);
+							}
+
+							let value = self.check_expr(right, expected_ty);
+
+							// TODO: binding is Option<Local>, so we can remove TyKind::Lazy and check if it's None
+							if let TyKind::Lazy = binding.ty.kind() {
+								// if no type is specified to the declaration, replace with actual type
+								// For let variables, widen literal types to base types
+								let inferred_type = if binding.is_assignable {
+									// let variable - widen literal types (42 -> number, true -> boolean)
+									self.widen(value.ty)
+								} else {
+									// const variable - keep literal types
+									value.ty
+								};
+								self.set_binding(&name, Some(value), inferred_type, true);
+								return value;
+							}
+
+							if !self.satisfies(binding.ty, value.ty) {
+								self.raise_type_error(binding.ty, value.ty, right.span());
+							}
+
+							self.set_binding(&name, Some(value), binding.ty, true);
+
+							value
+						}
+						SimpleAssignTarget::Member(member) => {
+							// Handle member assignment: obj.prop = value
+							let obj = self.check_expr(&member.obj, None);
+							let value = self.check_expr(right, expected_ty);
+							
+							match &member.prop {
+								MemberProp::Ident(ident) => {
+									let key = ident.sym.clone();
+									
+									// Check if the property exists and get its expected type
+									match obj.ty.kind() {
+										TyKind::Object(obj_ty) => {
+											if let Some(prop_ty) = obj_ty.get_prop(&key) {
+												// Property exists, check type compatibility
+												if !self.satisfies(prop_ty, value.ty) {
+													self.raise_type_error(prop_ty, value.ty, right.span());
+												}
+											} else {
+												// Property doesn't exist
+												self.add_error_with_span(
+													ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()),
+													ident.span,
+												);
+											}
+										}
+										_ => {
+											// Trying to assign to a property of a non-object type
+											self.add_error_with_span(
+												ErrorKind::PropertyDoesNotExist(obj.ty, key.clone()),
+												ident.span,
+											);
+										}
+									}
+									
+									// Return the assigned value
+									value
+								}
+								MemberProp::Computed(computed) => {
+									// Handle computed property assignment: obj[key] = value
+									let _index = self.check_expr(&computed.expr, None);
+									
+									match obj.ty.kind() {
+										TyKind::Array(array) => {
+											// Array element assignment
+											if !self.satisfies(array.element, value.ty) {
+												self.raise_type_error(array.element, value.ty, right.span());
+											}
+										}
+										TyKind::Object(_) => {
+											// Object with computed property - we don't track these precisely
+											// Just return the value without error
+										}
+										_ => {
+											// Can't index into non-array/object types
+											// But we'll be lenient and just return the value
+										}
+									}
+									
+									value
+								}
+								_ => todo!("Private member assignment not implemented"),
+							}
+						}
 						_ => todo!("{:#?}", target),
 					},
 					_ => todo!("{:#?}", left),
-				};
-				let name = Symbol::new(binding_ident.to_id());
-				let binding = if let Some(binding) = self.get_binding(&name) {
-					binding
-				} else {
-					// If binding doesn't exist, add an error and return
-					self.add_error_with_span(ErrorKind::CannotFindName(name), binding_span);
-					return self.add_local(self.constants.err, Value::Err);
-				};
-
-				if !binding.is_assignable {
-					self.add_error_with_span(
-						ErrorKind::CannotAssignToConst(name.clone()),
-						binding_span,
-					);
 				}
-
-				let value = self.check_expr(right, expected_ty);
-
-				// TODO: binding is Option<Local>, so we can remove TyKind::Lazy and check if it's None
-				if let TyKind::Lazy = binding.ty.kind() {
-					// if no type is specified to the declaration, replace with actual type
-					// For let variables, widen literal types to base types
-					let inferred_type = if binding.is_assignable {
-						// let variable - widen literal types (42 -> number, true -> boolean)
-						self.widen(value.ty)
-					} else {
-						// const variable - keep literal types
-						value.ty
-					};
-					self.set_binding(&name, Some(value), inferred_type, true);
-					return value;
-				}
-
-				if !self.satisfies(binding.ty, value.ty) {
-					self.raise_type_error(binding.ty, value.ty, right.span());
-				}
-
-				self.set_binding(&name, Some(value), binding.ty, true);
-
-				value
 			}
 			Expr::TsSatisfies(TsSatisfiesExpr { expr, type_ann, .. }) => {
 				let value = self.check_expr(expr, expected_ty);

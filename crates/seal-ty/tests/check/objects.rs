@@ -159,3 +159,59 @@ fail!(
     "#,
 	&["Property 'd' does not exist on type '{c: 42}'."]
 );
+
+pass!(
+	member_assignment_object,
+	r#"
+        let obj: { x: number, y: string } = { x: 10, y: "hello" };
+        obj.x = 20;
+        obj.y = "world";
+    "#
+);
+
+pass!(
+	member_assignment_array,
+	r#"
+        let arr: number[] = [1, 2, 3];
+        arr[0] = 10;
+        arr[4] = 4;
+        arr[100] = 100;
+        arr[-1] = 1;
+    "#
+);
+
+fail!(
+	member_assignment_type_mismatch,
+	r#"
+        let obj: { x: number } = { x: 10 };
+        obj.x = "wrong";
+    "#,
+	&["Type 'string' is not assignable to type 'number'."]
+);
+
+fail!(
+	member_assignment_property_not_exist,
+	r#"
+        let obj: { x: number } = { x: 10 };
+        obj.y = 20;
+    "#,
+	&["Property 'y' does not exist on type '{x: number}'."]
+);
+
+fail!(
+	array_element_assignment_type_mismatch_object,
+	r#"
+        let obj: { a: number } = { a: 10 };
+        obj.a = "wrong";
+    "#,
+	&["Type 'string' is not assignable to type 'number'."]
+);
+
+fail!(
+	array_element_assignment_type_mismatch_array,
+	r#"
+        let arr: number[] = [1, 2, 3];
+        arr[0] = "wrong";
+    "#,
+	&["Type 'string' is not assignable to type 'number'."]
+);
