@@ -116,17 +116,35 @@ impl<'tcx> BaseChecker<'tcx> {
 								}
 								MemberProp::Computed(computed) => {
 									// Handle computed property assignment: obj[key] = value
-									let _index = self.check_expr(&computed.expr, None);
+									let index = self.check_expr(&computed.expr, None);
 
 									match obj.ty.kind() {
 										TyKind::Array(array) => {
-											// Array element assignment
-											if !self.satisfies(array.element, value.ty) {
-												self.raise_type_error(
-													array.element,
-													value.ty,
-													right.span(),
+											if let Some(name) = member.obj.as_ident()
+												&& matches!(array.element.kind(), TyKind::Unknown)
+												&& matches!(index.ty.kind(), TyKind::Number(_))
+											{
+												let name = Symbol::from(name);
+												self.set_binding(
+													&name,
+													self.get_binding(&name).unwrap().current,
+													// new array with the inserted value type as element
+													self.tcx.new_array(
+														// TODO: widen on checking (not here)
+														//       e.g. widen if checking array assignment
+														self.widen(value.ty),
+													),
+													true,
 												);
+											} else {
+												// Array element assignment
+												if !self.satisfies(array.element, value.ty) {
+													self.raise_type_error(
+														array.element,
+														value.ty,
+														right.span(),
+													);
+												}
 											}
 										}
 										TyKind::Object(_) => {

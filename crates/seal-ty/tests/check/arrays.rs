@@ -123,3 +123,13 @@ fail!(
 		"Type 'unknown' is not assignable to type 'number'.",
 	]
 );
+
+pass!(
+	array_with_no_annotation_inference,
+	r#"
+        let arr = [];
+        arr satisfies unknown[];
+        arr[0] = 42;
+        arr satisfies number[];
+    "#
+);

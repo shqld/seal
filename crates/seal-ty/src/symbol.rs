@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display};
 
 use swc_atoms::Atom;
 use swc_common::SyntaxContext;
-use swc_ecma_ast::Id;
+use swc_ecma_ast::{Id, Ident};
 
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Symbol(Id);
@@ -34,6 +34,12 @@ impl Symbol {
 
 	pub fn name(&self) -> &Atom {
 		&self.0.0
+	}
+}
+
+impl From<&Ident> for Symbol {
+	fn from(ident: &Ident) -> Self {
+		Symbol(ident.to_id())
 	}
 }
 
